@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(New-Item -ItemType File -Path \"configs\\\\data\\\\.gitkeep\" -Force)",
+      "Bash(Out-Null)",
+      "Bash(New-Item -ItemType File -Path \"configs\\\\model\\\\.gitkeep\" -Force)",
+      "Bash(New-Item -ItemType File -Path \"configs\\\\loss\\\\.gitkeep\" -Force)",
+      "Bash(New-Item -ItemType File -Path \"configs\\\\experiment\\\\.gitkeep\" -Force)",
+      "Bash(New-Item -ItemType File -Path \"scripts\\\\.gitkeep\" -Force)",
+      "Bash(New-Item -ItemType File -Path \"reports\\\\figures\\\\.gitkeep\" -Force)",
+      "Bash(New-Item -ItemType File -Path \"reports\\\\tables\\\\.gitkeep\" -Force)",
+      "Bash(git init *)",
+      "Bash(git add *)",
+      "Bash(git commit -m '[Stage0] repo bootstrap *)"
+    ]
+  }
+}
