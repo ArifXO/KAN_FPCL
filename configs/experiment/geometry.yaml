@@ -1,0 +1,32 @@
+# configs/experiment/geometry.yaml
+# Stage 8: geometry metrics on a saved checkpoint (R6).
+
+defaults:
+  - _self_
+  - /data: chestmnist
+  - /model: mlp_baseline
+
+hydra:
+  searchpath:
+    - file://${oc.env:PROJECT_ROOT}/configs
+
+geometry:
+  checkpoint_dir: ""          # path to run_<id>/ directory (required)
+  output_csv: reports/tables/geometry.csv
+  eval_splits: [train, val, test]
+  alignment_split: train
+  max_samples: 2048           # set null for full pdist; keeps smoke runs bounded
+  seed: 42
+  device: cpu
+
+# Metadata written to geometry.csv row
+meta:
+  encoder: resnet18
+  head: mlp
+  loss: infonce
+  dataset: chestmnist
+
+data:
+  batch_size: 256
+  num_workers: 0
+  download: false
