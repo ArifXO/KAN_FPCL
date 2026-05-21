@@ -1,0 +1,55 @@
+# configs/data/chexpert.yaml
+# CheXpert pipeline (Stage 9). R6: no hardcoded hyperparams.
+#
+# CheXpert is NOT bundled with the repo. Set `root` to the directory that
+# contains train.csv / valid.csv and the CheXpert-v1.0 image tree (or the
+# preprocessed copy emitted by scripts/preprocess_chexpert.py).
+#
+# Patient-level splitting (R4/R5) is enforced inside CheXpertDataset via
+# chexpert_patient_ids_from_paths(). The official `valid.csv` is used as
+# `val`; a `test` carve-out is built at runtime from disjoint train
+# patients using patient_level_split.
+
+_target_: src.data.CheXpertDataset
+
+# Filesystem root — override per machine. ENV expansion is intentional so
+# this config works on any host that exports CHEXPERT_ROOT.
+root: ${oc.env:CHEXPERT_ROOT,/data/chexpert}
+
+# Split: train | val (=valid.csv) | test (runtime carve-out)
+split: train
+
+# View filter: frontal | lateral | all
+view: frontal
+
+# Uncertainty policy — DEFAULT is ignore (drop rows with any -1).
+# Alternatives: positive, negative, LSR.
+uncertainty_policy: ignore
+
+# Image side in pixels after resize at load time.
+image_size: 224
+
+# DataLoader settings (mirrors chestmnist.yaml convention).
+batch_size: 128
+num_workers: 0
+pin_memory: false
+
+# Seed for patient_level_split carve-out (test set construction).
+split_seed: 42
+
+# Test carve-out ratio out of the train manifest (val comes from valid.csv).
+# Keep train:test ≈ 0.85:0.15 of the train manifest patients.
+test_ratio: 0.15
+
+# Normalization for single-channel CXR (matches preprocess output).
+normalize:
+  mean: [0.5]
+  std: [0.5]
+
+augmentation:
+  crop_scale_min: 0.6
+  crop_scale_max: 1.0
+  rotation_degrees: 15
+  brightness: 0.3
+  contrast: 0.3
+  horizontal_flip_prob: 0.5

@@ -1,0 +1,197 @@
+"""Cell × seed ablation orchestrator (Stage 10, R6/R8/R9).
+
+For each (cell, seed) in ``configs/experiment/ablation.yaml``:
+    train -> probe -> analyze_geometry
+then append one merged row to ``ablation_master.csv``.
+
+A failure in any sub-step is captured as ``status=FAILED: <exception>`` so
+the next cell still runs — one OOM must not lose the rest of the matrix.
+
+Sub-scripts are invoked as subprocesses (``python -m scripts.<name>``) and
+re-use their existing Hydra configs; this script only orchestrates and
+merges the per-step CSV rows.
+"""
+
+from __future__ import annotations
+
+import csv
+import os
+import re
+import subprocess
+import sys
+import time
+import traceback
+from pathlib import Path
+
+os.environ.setdefault(
+    "PROJECT_ROOT", str(Path(__file__).resolve().parent.parent).replace("\\", "/")
+)
+
+import hydra
+from omegaconf import DictConfig
+
+_COLUMNS = [
+    "cell_id", "head", "loss", "scorer", "lambda_edge", "lambda_edge_align",
+    "dataset", "seed", "params_total", "macro_auroc_linear", "macro_auroc_knn",
+    "mAP", "alignment", "uniformity", "effective_rank", "runtime_sec", "status",
+]
+
+
+def _append_row(csv_path: Path, row: dict) -> None:
+    csv_path.parent.mkdir(parents=True, exist_ok=True)
+    write_header = not csv_path.exists()
+    with open(csv_path, "a", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=_COLUMNS)
+        if write_header:
+            w.writeheader()
+        w.writerow({k: row.get(k, "") for k in _COLUMNS})
+
+
+def _run(cmd: list[str], cwd: Path) -> str:
+    proc = subprocess.run(
+        cmd, capture_output=True, text=True, cwd=cwd, env=os.environ.copy()
+    )
+    if proc.returncode != 0:
+        raise RuntimeError(
+            f"Command failed (exit {proc.returncode}): {' '.join(cmd)}\n"
+            f"--- stdout ---\n{proc.stdout}\n--- stderr ---\n{proc.stderr}"
+        )
+    return proc.stdout
+
+
+def _find_run_dir(stdout: str) -> Path:
+    m = re.search(r"Run artifacts saved to:\s*(.+)", stdout)
+    if m is None:
+        raise RuntimeError(
+            "Could not parse 'Run artifacts saved to:' line from train stdout. "
+            "Ensure the chosen train_script prints that sentinel."
+        )
+    return Path(m.group(1).strip())
+
+
+def _last_csv_row(csv_path: Path) -> dict[str, str]:
+    if not csv_path.exists():
+        raise FileNotFoundError(f"Expected CSV not produced: {csv_path}")
+    with open(csv_path, "r", newline="") as f:
+        rows = list(csv.DictReader(f))
+    if not rows:
+        raise RuntimeError(f"CSV {csv_path} has a header but no data rows.")
+    return rows[-1]
+
+
+def _train(cell: DictConfig, seed: int, project_root: Path) -> Path:
+    overrides = list(cell.get("overrides", []))
+    cmd = [
+        sys.executable, "-m", str(cell.train_script),
+        f"--config-name={cell.train_config}",
+        f"run.seed={seed}",
+        f"run.name={cell.cell_id}_s{seed}",
+        *overrides,
+    ]
+    return _find_run_dir(_run(cmd, project_root))
+
+
+def _probe(
+    ckpt_dir: Path, cell: DictConfig, seed: int, csv_path: Path, project_root: Path
+) -> dict[str, str]:
+    cmd = [
+        sys.executable, "-m", "scripts.probe",
+        f"probe.checkpoint_dir={ckpt_dir}",
+        f"probe.seed={seed}",
+        f"probe.output_csv={csv_path}",
+        f"meta.head={cell.head}",
+        f"meta.loss={cell.loss}",
+        f"meta.scorer={cell.scorer}",
+        f"meta.dataset={cell.dataset}",
+    ]
+    _run(cmd, project_root)
+    return _last_csv_row(csv_path)
+
+
+def _geometry(
+    ckpt_dir: Path, cell: DictConfig, seed: int, csv_path: Path, project_root: Path
+) -> dict[str, str]:
+    cmd = [
+        sys.executable, "-m", "scripts.analyze_geometry",
+        f"geometry.checkpoint_dir={ckpt_dir}",
+        f"geometry.seed={seed}",
+        f"geometry.output_csv={csv_path}",
+        f"meta.head={cell.head}",
+        f"meta.loss={cell.loss}",
+        f"meta.dataset={cell.dataset}",
+    ]
+    _run(cmd, project_root)
+    return _last_csv_row(csv_path)
+
+
+def _run_cell(
+    cell: DictConfig,
+    seed: int,
+    out_csv: Path,
+    probe_csv: Path,
+    geom_csv: Path,
+    project_root: Path,
+) -> None:
+    row = {
+        "cell_id": cell.cell_id,
+        "head": cell.head,
+        "loss": cell.loss,
+        "scorer": cell.scorer,
+        "lambda_edge": cell.get("lambda_edge", ""),
+        "lambda_edge_align": cell.get("lambda_edge_align", ""),
+        "dataset": cell.dataset,
+        "seed": seed,
+        "status": "FAILED",
+    }
+    t0 = time.time()
+    try:
+        ckpt_dir = _train(cell, seed, project_root)
+        probe_row = _probe(ckpt_dir, cell, seed, probe_csv, project_root)
+        geom_row = _geometry(ckpt_dir, cell, seed, geom_csv, project_root)
+        row.update({
+            "params_total": probe_row.get("params_total", ""),
+            "macro_auroc_linear": probe_row.get("macro_auroc_linear", ""),
+            "macro_auroc_knn": probe_row.get("macro_auroc_knn", ""),
+            "mAP": probe_row.get("mAP", ""),
+            "alignment": geom_row.get("alignment", ""),
+            "uniformity": geom_row.get("uniformity", ""),
+            "effective_rank": geom_row.get("effective_rank", ""),
+            "status": "OK",
+        })
+    except Exception as e:
+        msg = f"{type(e).__name__}: {e}".replace("\n", " | ").replace("\r", " ")
+        row["status"] = f"FAILED: {msg}"[:512]
+        traceback.print_exc()
+    finally:
+        row["runtime_sec"] = round(time.time() - t0, 2)
+        _append_row(out_csv, row)
+        print(
+            f"[ablate] cell={cell.cell_id} seed={seed} "
+            f"status={row['status'][:40]} runtime={row['runtime_sec']}s"
+        )
+
+
+@hydra.main(
+    version_base=None, config_path="../configs/experiment", config_name="ablation"
+)
+def main(cfg: DictConfig) -> None:
+    if not cfg.ablate.cells:
+        raise ValueError("ablate.cells is empty — nothing to run.")
+    seeds = list(cfg.ablate.seeds)
+    if not seeds:
+        raise ValueError("ablate.seeds is empty — at least one seed required.")
+
+    project_root = Path(os.environ["PROJECT_ROOT"])
+    out_csv = Path(cfg.ablate.output_csv)
+    probe_csv = project_root / cfg.ablate.probe_csv
+    geom_csv = project_root / cfg.ablate.geometry_csv
+
+    n = sum(1 for _ in cfg.ablate.cells) * len(seeds)
+    print(f"[ablate] {n} (cell x seed) combinations -> {out_csv}")
+    for cell in cfg.ablate.cells:
+        for seed in seeds:
+            _run_cell(cell, int(seed), out_csv, probe_csv, geom_csv, project_root)
+
+
+if __name__ == "__main__":
+    main()

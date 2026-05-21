@@ -40,7 +40,16 @@
       "Bash(.venv/Scripts/python -m scripts.train_edge run.name=smoke_edge_aware_l05 loss.lambda_edge=0.05 loss.lambda_edge_align=0.05)",
       "Bash(.venv/Scripts/python -m scripts.probe probe.checkpoint_dir=checkpoints/run_smoke_edge_aware_l0_20260521-230921-a618fd meta.head=fastkan meta.loss=edge_aware_fn meta.scorer=edge_mlp_l0)",
       "Bash(.venv/Scripts/python -m scripts._smoke_probe_edge checkpoints/run_smoke_edge_aware_l0_20260521-230921-a618fd edge_mlp_l0)",
-      "Bash(.venv/Scripts/python -m scripts._smoke_probe_edge checkpoints/run_smoke_edge_aware_l05_20260521-231011-2bdca4 edge_mlp_l05)"
+      "Bash(.venv/Scripts/python -m scripts._smoke_probe_edge checkpoints/run_smoke_edge_aware_l05_20260521-231011-2bdca4 edge_mlp_l05)",
+      "Bash(python -m pytest tests/test_chexpert.py -v -p no:cacheprovider --override-ini=\"addopts=\")",
+      "Bash(python -m pytest tests/test_data_splits.py tests/test_data_pipeline.py -v --override-ini=\"addopts=\")",
+      "Bash(set PYTHONIOENCODING=utf-8)",
+      "Bash(python -c ' *)",
+      "PowerShell(Test-Path *)",
+      "PowerShell(Get-Command *)",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('scripts/ablate.py'\\).read\\(\\)\\); print\\('syntax ok'\\)\")",
+      "Bash(python -m scripts.ablate --config-name=ablation_smoke)",
+      "Bash(python -m scripts.ablate --config-name=ablation_smoke_fail)"
     ]
   }
 }

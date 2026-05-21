@@ -10,19 +10,23 @@ from torch.utils.data import DataLoader
 from omegaconf import DictConfig
 
 from .chestmnist import ChestMNISTDataset
+from .chexpert import CheXpertDataset, patient_id_from_path
 from .augmentations import (
     TwoViewTransform,
     build_contrastive_transform,
     build_eval_transform,
 )
-from .splits import patient_level_split
+from .splits import patient_level_split, chexpert_patient_ids_from_paths
 
 __all__ = [
     "ChestMNISTDataset",
+    "CheXpertDataset",
+    "patient_id_from_path",
     "TwoViewTransform",
     "build_contrastive_transform",
     "build_eval_transform",
     "patient_level_split",
+    "chexpert_patient_ids_from_paths",
     "get_dataloader",
 ]
 

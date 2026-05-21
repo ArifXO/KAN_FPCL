@@ -1,0 +1,38 @@
+# 2-cell × 1-seed smoke: cell 1 is deliberately broken (bad override),
+# cell 2 is healthy. Verifies that ablate.py keeps going after a FAILED.
+
+hydra:
+  searchpath:
+    - file://${oc.env:PROJECT_ROOT}/configs
+
+ablate:
+  output_csv: reports/tables/_ablate_smoke_fail_master.csv
+  probe_csv: reports/tables/_ablate_smoke_fail_probe.csv
+  geometry_csv: reports/tables/_ablate_smoke_fail_geometry.csv
+
+  seeds: [42]
+
+  cells:
+    - cell_id: smoke_broken
+      train_script: scripts.train
+      train_config: smoke_mlp
+      head: mlp
+      loss: infonce
+      scorer: none
+      lambda_edge: 0.0
+      lambda_edge_align: 0.0
+      dataset: chestmnist
+      overrides:
+        - train.max_steps=NOT_AN_INT   # deliberate type failure
+    - cell_id: smoke_ok
+      train_script: scripts.train
+      train_config: smoke_mlp
+      head: mlp
+      loss: infonce
+      scorer: none
+      lambda_edge: 0.0
+      lambda_edge_align: 0.0
+      dataset: chestmnist
+      overrides:
+        - train.max_steps=2
+        - data.batch_size=4

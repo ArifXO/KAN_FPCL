@@ -1,0 +1,85 @@
+# configs/experiment/ablation.yaml
+# Stage 10: cell × seed ablation matrix orchestrated by scripts/ablate.py.
+# Each cell triggers: train -> probe -> analyze_geometry, with one merged
+# row appended to ablation_master.csv. Per-step intermediate CSVs are kept
+# under reports/tables/_ablate_*.csv so a re-run is recoverable (R8).
+#
+# To add a cell: append an entry to `cells` with:
+#   - cell_id            : unique label used in CSV + checkpoint run name
+#   - train_script       : python module path (e.g. scripts.train, scripts.train_edge)
+#   - train_config       : Hydra experiment config (e.g. edge_aware_fn_mlp)
+#   - head/loss/scorer   : *labels* written into the CSV row (not Hydra overrides)
+#   - lambda_edge        : label only — actual value must also be in `overrides`
+#   - lambda_edge_align  : label only — actual value must also be in `overrides`
+#   - dataset            : label only (chestmnist | chexpert)
+#   - overrides          : extra Hydra overrides forwarded to the train script
+#
+# CLAUDE.md R6 compliance: lambdas live in `overrides`, NOT hardcoded in the
+# train script. The duplicate label fields above let downstream analysis
+# group rows without re-parsing override strings.
+
+hydra:
+  searchpath:
+    - file://${oc.env:PROJECT_ROOT}/configs
+
+ablate:
+  output_csv: ablation_master.csv
+  probe_csv: reports/tables/_ablate_probe.csv
+  geometry_csv: reports/tables/_ablate_geometry.csv
+
+  seeds: [42, 1337, 2024]
+
+  cells:
+    # H1 baseline: MLP head, plain InfoNCE.
+    - cell_id: mlp_infonce
+      train_script: scripts.train
+      train_config: smoke_mlp
+      head: mlp
+      loss: infonce
+      scorer: none
+      lambda_edge: 0.0
+      lambda_edge_align: 0.0
+      dataset: chestmnist
+      overrides: []
+
+    # H4 control: edge wiring ON, lambdas OFF (Stage 7.5 "edge_off" cell).
+    - cell_id: edge_off
+      train_script: scripts.train_edge
+      train_config: edge_aware_fn_mlp
+      head: fastkan
+      loss: edge_aware_fn
+      scorer: edge_mlp
+      lambda_edge: 0.0
+      lambda_edge_align: 0.0
+      dataset: chestmnist
+      overrides:
+        - loss.lambda_edge=0.0
+        - loss.lambda_edge_align=0.0
+
+    # H4 treatment: edge contrastive aux ON.
+    - cell_id: edge_contrastive
+      train_script: scripts.train_edge
+      train_config: edge_aware_fn_mlp
+      head: fastkan
+      loss: edge_aware_fn
+      scorer: edge_mlp
+      lambda_edge: 0.5
+      lambda_edge_align: 0.0
+      dataset: chestmnist
+      overrides:
+        - loss.lambda_edge=0.5
+        - loss.lambda_edge_align=0.0
+
+    # H4 treatment: edge-align aux ON.
+    - cell_id: edge_align
+      train_script: scripts.train_edge
+      train_config: edge_aware_fn_mlp
+      head: fastkan
+      loss: edge_aware_fn
+      scorer: edge_mlp
+      lambda_edge: 0.0
+      lambda_edge_align: 0.5
+      dataset: chestmnist
+      overrides:
+        - loss.lambda_edge=0.0
+        - loss.lambda_edge_align=0.5

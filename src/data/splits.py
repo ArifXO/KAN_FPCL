@@ -4,6 +4,34 @@ from __future__ import annotations
 
 import random
 from collections import defaultdict
+from pathlib import Path
+
+
+def chexpert_patient_ids_from_paths(paths: list[str]) -> list[str]:
+    """Extract CheXpert patient IDs from a list of manifest ``Path`` strings.
+
+    Each path is expected to look like
+    ``CheXpert-v1.0/<split>/patient00001/study<k>/view<m>_<view>.jpg``.
+
+    Raises:
+        ValueError: If any path lacks a ``patient*`` token (R5/R9).
+    """
+    ids: list[str] = []
+    bad: list[str] = []
+    for p in paths:
+        token = next(
+            (t for t in Path(p).parts if t.startswith("patient")), None
+        )
+        if token is None:
+            bad.append(p)
+        else:
+            ids.append(token)
+    if bad:
+        raise ValueError(
+            f"{len(bad)} CheXpert paths lack a 'patient*' segment. "
+            f"First offender: {bad[0]!r}. Manifest is malformed."
+        )
+    return ids
 
 
 def patient_level_split(
