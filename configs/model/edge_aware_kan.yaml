@@ -1,0 +1,40 @@
+# configs/model/edge_aware_kan.yaml
+# Stage 7.5 model bundle (KAN head): ResNet-18 + KAN projector + EdgeAware(KAN scorer).
+#
+# EdgeAwarePairScorer KAN params @ input_dim=128, edge_dim=256,
+# kan_hidden_dim=4, kan_num_centers=3, kan_use_base_linear=true:
+#   pair_feat_dim = 260
+#   FastKANLayer(260->4, centers=3, base=True):
+#     rbf_weight = 4*260*3 = 3,120; bw = 1; base = 260*4+4 = 1,044 ;  sub=4,165
+#   Linear(4 -> 1) = 5
+#   Total = 4,170 (anchor 4,465 -> ratio 0.934, within R1 ±15 %).
+
+encoder:
+  _target_: src.models.ResNet18Encoder
+  pretrained: false
+
+head:
+  _target_: src.models.kan.FastKANProjector
+  input_dim: 512
+  hidden_dim: 64
+  output_dim: 128
+  num_centers: 8
+  grid_min: -2.0
+  grid_max: 2.0
+  use_base_linear: true
+  base_activation: silu
+  rbf_init_scale: 0.1
+  normalize: true
+
+scorer:
+  _target_: src.models.EdgeAwarePairScorer
+  input_dim: 128
+  edge_dim: 256
+  hidden_dim: 16
+  num_layers: 2
+  activation: relu
+  use_edge_features: true
+  scorer_type: kan
+  kan_hidden_dim: 4
+  kan_num_centers: 3
+  kan_use_base_linear: true

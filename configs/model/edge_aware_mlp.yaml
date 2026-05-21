@@ -1,0 +1,39 @@
+# configs/model/edge_aware_mlp.yaml
+# Stage 7.5 model bundle (MLP head): ResNet-18 + KAN projector + EdgeAware(MLP scorer).
+# The head MUST be a FastKAN projector so the loss can pull edges via
+# `head(h, return_edges=True)`.
+#
+# EdgeAwarePairScorer MLP params @ input_dim=128, edge_dim=256, hidden=16,
+# layers=2, use_edge_features=true:
+#   pair_feat_dim = 2 + 2*128 + 2 = 260
+#   Layer1: 260*16+16 = 4,176
+#   Layer2: 16*16+16  = 272
+#   Out:    16*1+1    = 17
+#   Total ≈ 4,465 (R1 anchor for the KAN variant; ±15 % => 3.8K–5.1K).
+
+encoder:
+  _target_: src.models.ResNet18Encoder
+  pretrained: false
+
+head:
+  _target_: src.models.kan.FastKANProjector
+  input_dim: 512
+  hidden_dim: 64
+  output_dim: 128
+  num_centers: 8
+  grid_min: -2.0
+  grid_max: 2.0
+  use_base_linear: true
+  base_activation: silu
+  rbf_init_scale: 0.1
+  normalize: true
+
+scorer:
+  _target_: src.models.EdgeAwarePairScorer
+  input_dim: 128
+  edge_dim: 256
+  hidden_dim: 16
+  num_layers: 2
+  activation: relu
+  use_edge_features: true
+  scorer_type: mlp

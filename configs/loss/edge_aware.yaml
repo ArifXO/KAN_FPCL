@@ -1,0 +1,17 @@
+# configs/loss/edge_aware.yaml
+# Stage 7.5 loss: Edge-aware FN-weighted InfoNCE. Lambdas default to 0 so this
+# loss is numerically identical to Stage 7 unless the experiment explicitly
+# turns the aux terms on.
+#
+# Marker `edge_aware: true` tells `scripts/train_edge.py` to compute edge
+# fingerprints and forward them to the scorer + loss.
+
+_target_: src.losses.EdgeAwareFNWeightedInfoNCELoss
+temperature: 0.1
+normalize_embeddings: true
+max_fn_weight: 0.5      # cap FN trivial-optimum reward (Pitfall #5 mitigation)
+lambda_edge: 0.0
+tau_edge: 0.1
+lambda_edge_align: 0.0
+
+edge_aware: true

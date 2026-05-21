@@ -2,6 +2,15 @@
 
 from .infonce import InfoNCELoss
 from .fn_weighted_infonce import FNWeightedInfoNCELoss
+from .edge_aware_fn_loss import EdgeAwareFNWeightedInfoNCELoss
+from .edge_features import edge_fingerprint, edge_pair_similarity
 from .masks import build_positive_mask
 
-__all__ = ["InfoNCELoss", "FNWeightedInfoNCELoss", "build_positive_mask"]
+__all__ = [
+    "InfoNCELoss",
+    "FNWeightedInfoNCELoss",
+    "EdgeAwareFNWeightedInfoNCELoss",
+    "edge_fingerprint",
+    "edge_pair_similarity",
+    "build_positive_mask",
+]

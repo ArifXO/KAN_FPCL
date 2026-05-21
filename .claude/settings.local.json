@@ -33,7 +33,14 @@
       "PowerShell(cd \"A:\\\\UNI\\\\CSE400\\\\KAN_FPCL\"; \\(Get-Content src\\\\metrics\\\\auc.py\\).Count; \\(Get-Content src\\\\metrics\\\\linear_probe.py\\).Count; \\(Get-Content src\\\\metrics\\\\knn.py\\).Count; \\(Get-Content scripts\\\\probe.py\\).Count)",
       "PowerShell(. .venv\\\\Scripts\\\\Activate.ps1; python -m pytest tests/ -q --no-cov 2>&1 | Select-Object -Last 30)",
       "PowerShell(Remove-Item *)",
-      "PowerShell(. .venv\\\\Scripts\\\\Activate.ps1; python -m pytest tests/test_infonce.py tests/test_fn_weighted_loss.py tests/test_pair_scorer.py -q --no-cov 2>&1 | Select-Object -Last 10)"
+      "PowerShell(. .venv\\\\Scripts\\\\Activate.ps1; python -m pytest tests/test_infonce.py tests/test_fn_weighted_loss.py tests/test_pair_scorer.py -q --no-cov 2>&1 | Select-Object -Last 10)",
+      "Bash(.venv/Scripts/python -m pytest tests/test_edge_features.py tests/test_edge_aware_fn_loss.py -v)",
+      "Bash(.venv/Scripts/python -m pytest tests/ -v --no-cov)",
+      "Bash(.venv/Scripts/python -m scripts.train_edge run.name=smoke_edge_aware_l0)",
+      "Bash(.venv/Scripts/python -m scripts.train_edge run.name=smoke_edge_aware_l05 loss.lambda_edge=0.05 loss.lambda_edge_align=0.05)",
+      "Bash(.venv/Scripts/python -m scripts.probe probe.checkpoint_dir=checkpoints/run_smoke_edge_aware_l0_20260521-230921-a618fd meta.head=fastkan meta.loss=edge_aware_fn meta.scorer=edge_mlp_l0)",
+      "Bash(.venv/Scripts/python -m scripts._smoke_probe_edge checkpoints/run_smoke_edge_aware_l0_20260521-230921-a618fd edge_mlp_l0)",
+      "Bash(.venv/Scripts/python -m scripts._smoke_probe_edge checkpoints/run_smoke_edge_aware_l05_20260521-231011-2bdca4 edge_mlp_l05)"
     ]
   }
 }

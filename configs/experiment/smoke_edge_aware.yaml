@@ -1,0 +1,32 @@
+# configs/experiment/smoke_edge_aware.yaml
+# Stage 7.5 smoke run — verifies edge-fingerprint plumbing executes end-to-end
+# and writes the R8 artifact set. Not a real training run (see "Smoke Runs
+# Are Not Hypothesis Evidence" in CLAUDE.md). Defaults to MLP scorer with
+# lambdas=0; flip `loss.lambda_edge` on the CLI to activate H4 wiring.
+
+defaults:
+  - _self_
+  - /data: chestmnist
+  - /model: edge_aware_mlp
+  - /loss: edge_aware
+
+hydra:
+  searchpath:
+    - file://${oc.env:PROJECT_ROOT}/configs
+
+run:
+  name: smoke_edge_aware
+  output_root: checkpoints
+  seed: 42
+  deterministic: false
+  device: cpu
+
+train:
+  max_steps: 5
+  log_every: 1
+  lr: 0.001
+
+data:
+  batch_size: 4
+  num_workers: 0
+  download: false
