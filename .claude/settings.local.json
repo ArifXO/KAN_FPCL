@@ -30,7 +30,10 @@
       "Bash(.venv/Scripts/python scripts/train.py --cfg job)",
       "Bash(.venv/Scripts/python -m pytest tests/test_infonce.py -v --no-cov)",
       "Bash(.venv/Scripts/python -m pytest tests/ --no-cov)",
-      "PowerShell(cd \"A:\\\\UNI\\\\CSE400\\\\KAN_FPCL\"; \\(Get-Content src\\\\metrics\\\\auc.py\\).Count; \\(Get-Content src\\\\metrics\\\\linear_probe.py\\).Count; \\(Get-Content src\\\\metrics\\\\knn.py\\).Count; \\(Get-Content scripts\\\\probe.py\\).Count)"
+      "PowerShell(cd \"A:\\\\UNI\\\\CSE400\\\\KAN_FPCL\"; \\(Get-Content src\\\\metrics\\\\auc.py\\).Count; \\(Get-Content src\\\\metrics\\\\linear_probe.py\\).Count; \\(Get-Content src\\\\metrics\\\\knn.py\\).Count; \\(Get-Content scripts\\\\probe.py\\).Count)",
+      "PowerShell(. .venv\\\\Scripts\\\\Activate.ps1; python -m pytest tests/ -q --no-cov 2>&1 | Select-Object -Last 30)",
+      "PowerShell(Remove-Item *)",
+      "PowerShell(. .venv\\\\Scripts\\\\Activate.ps1; python -m pytest tests/test_infonce.py tests/test_fn_weighted_loss.py tests/test_pair_scorer.py -q --no-cov 2>&1 | Select-Object -Last 10)"
     ]
   }
 }

@@ -157,6 +157,14 @@ z_norm = z / norm
 ### **4. Edge Fingerprint Compression**
 For high-dimensional edge tensors (e.g., d_in × d_out × num_centers), compressing to 256 dimensions is mandatory to avoid memory explosion.
 
+### **5. Scorer Collapse Under FN-Weighted Loss (Stage 6+)**
+`FNWeightedInfoNCELoss` is monotonically decreasing in `p_fn` for any fixed embedding: pushing `p_fn → max_fn_weight` is the trivial optimum. Without an auxiliary signal the MLP/KAN scorer **will collapse to saturated outputs**, and the loss reduction becomes meaningless. Mitigations (apply at least one for any non-smoke training run):
+- Set `max_fn_weight ≤ 0.5` in `configs/loss/fn_weighted_mlp.yaml` to cap the trivial reward.
+- Add a sparsity regularizer (e.g., `λ_sparsity · p_fn.mean()`) so saturation has a cost.
+- Wait for Stage 7's edge-align auxiliary term (planned H4 mitigation) before treating any FN-weighted AUROC delta as evidence for H2.
+
+**Smoke trace from `run_smoke_fn_mlp_20260521-195829-d1d901`:** `p_fn_mean` drifted 0.533 → 0.546 over 5 steps with `max_fn_weight=1.0` and no aux loss — the signature of incipient collapse, not learning.
+
 ---
 
 ## **Hypothesis Gates (When Each Claim is Testable)**
@@ -167,6 +175,9 @@ For high-dimensional edge tensors (e.g., d_in × d_out × num_centers), compress
 | **H2 (FN loss improves recall)** | FN-weighted AUROC > InfoNCE AUROC across 3 seeds. Rare-disease AUROC improvement ≥2% absolute. | Stage 7 merge |
 | **H3 (KAN scorer > MLP scorer)** | KAN scorer AUROC > MLP scorer AUROC within H2 framework. Param parity verified. | Stage 7.5 setup |
 | **H4 (Edge signals improve FN detection)** | Edge-aware loss + edge-align (λ>0) gives ≥1% AUROC improvement over z-only scorer. | Final ablation |
+
+### **Smoke Runs Are Not Hypothesis Evidence**
+A smoke run (≤10 steps, batch_size=4) only proves the pipeline *executes*. The probe row it produces is at random-baseline AUROC by construction and **must not be cited as evidence for or against any H1–H4 gate**. Each hypothesis requires a full training run with the seeds listed under "Metadata for Papers" (default `[42, 1337, 2024]`); only those rows count toward gate evaluation. Smoke rows in `probe_results.csv` should be tagged in the `run_id` (`smoke_*`) so they are filtered out of seed-averaged reports.
 
 ---
 

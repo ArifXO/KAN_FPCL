@@ -1,0 +1,15 @@
+# configs/loss/fn_weighted_mlp.yaml
+# Stage 6: SimCLR InfoNCE with false-negative downweighting from a paired
+# scorer (R6 — all hyperparams come from this YAML).
+#
+# Param-parity note (R1): the MLP pair scorer at hidden_dim=32, num_layers=2
+# with input_dim=128 carries ~9.3K params; the KAN scorer in Stage 7 must
+# stay within ±15 % of this footprint to validate H3.
+
+_target_: src.losses.FNWeightedInfoNCELoss
+temperature: 0.1
+normalize_embeddings: true
+# Cap on p_fn before computing (1 - p_fn). 1.0 = allow complete removal of a
+# negative; 0.95 = floor of 0.05 on the negative weight (recommended once the
+# scorer is trained to avoid collapsing the denominator).
+max_fn_weight: 1.0

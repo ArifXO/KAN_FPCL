@@ -1,3 +1,4 @@
-run_id                , encoder , head                 , loss   , scorer, dataset   , seed, params_total, macro_auroc_linear, macro_auroc_knn, mAP     , runtime_sec
-20260521-190810-de3883, resnet18, mlp                  , infonce, none  , chestmnist,   42,     11499584,           0.653661,        0.589873, 0.090443,       84.48
-20260521-193114-1f3811, resnet18, residual_fastkan_warp, infonce, none  , chestmnist,   42,     11503591,           0.657878,        0.597157, 0.094796,      100.75
+run_id                , encoder , head                 , loss      , scorer, dataset   , seed, params_total, macro_auroc_linear, macro_auroc_knn, mAP     , runtime_sec
+20260521-190810-de3883, resnet18, mlp                  , infonce   , none  , chestmnist,   42,     11499584,           0.653661,        0.589873, 0.090443,       84.48
+20260521-193114-1f3811, resnet18, residual_fastkan_warp, infonce   , none  , chestmnist,   42,     11503591,           0.657878,        0.597157, 0.094796,      100.75
+20260521-200013-4f4948, resnet18, mlp                  , fn_infonce, mlp   , chestmnist,   42,     11499584,           0.657493,        0.586259, 0.0904  ,       86.02

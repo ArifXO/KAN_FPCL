@@ -1,0 +1,30 @@
+# configs/experiment/smoke_fn_mlp.yaml
+# Stage 6 smoke run — verifies the full FN-weighted pipeline executes
+# end-to-end and writes the R8 artifact set. Not a real training run.
+
+defaults:
+  - _self_
+  - /data: chestmnist
+  - /model: mlp_scorer
+  - /loss: fn_weighted_mlp
+
+hydra:
+  searchpath:
+    - file://${oc.env:PROJECT_ROOT}/configs
+
+run:
+  name: smoke_fn_mlp
+  output_root: checkpoints
+  seed: 42
+  deterministic: false
+  device: cpu
+
+train:
+  max_steps: 5
+  log_every: 1
+  lr: 0.001
+
+data:
+  batch_size: 4
+  num_workers: 0
+  download: false
