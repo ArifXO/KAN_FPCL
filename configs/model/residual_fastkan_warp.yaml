@@ -1,0 +1,24 @@
+# configs/model/residual_fastkan_warp.yaml
+# Stage 5 residual FastKAN warp: ResNet-18 encoder + same-width residual warp.
+# R1 parity: MLP head @ 512->512->128 with BN = 329,344 trainable params.
+# Residual warp @ 512->36->512, 8 centers, base linear = 333,351 params.
+# Difference: +1.22% (within +-15%).
+
+encoder:
+  _target_: src.models.ResNet18Encoder
+  pretrained: false
+
+head:
+  _target_: src.models.kan.ResidualFastKANWarp
+  input_dim: 512
+  hidden_dim: 36
+  num_centers: 8
+  grid_min: -2.0
+  grid_max: 2.0
+  use_base_linear: true
+  base_activation: silu
+  rbf_init_scale: 0.1
+  alpha_init: 0.0
+  learnable_alpha: true
+  clamp_alpha: true
+  clamp_max: 0.2
