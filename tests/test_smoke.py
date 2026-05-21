@@ -68,6 +68,6 @@ def test_claude_md_contains_all_rules():
 
 def test_todo_all_unchecked():
     root = pathlib.Path(__file__).parent.parent
-    text = (root / "TODO.md").read_text()
+    text = (root / "TODO.md").read_text(encoding="utf-8")
     assert "- [x]" not in text.lower(), "TODO.md should have no checked items at Stage 0"
     assert "- [ ]" in text, "TODO.md should contain unchecked items"

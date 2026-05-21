@@ -1,0 +1,33 @@
+# configs/experiment/probe.yaml
+# Stage 3: linear-probe + kNN evaluation on a saved checkpoint (R6, R8).
+
+defaults:
+  - _self_
+  - /data: chestmnist
+  - /model: mlp_baseline
+
+hydra:
+  searchpath:
+    - file://${oc.env:PROJECT_ROOT}/configs
+
+probe:
+  checkpoint_dir: ""          # path to run_<id>/ directory (required)
+  output_csv: probe_results.csv
+  knn_k: 20
+  probe_max_iter: 1000
+  probe_C: 1.0
+  seed: 42
+  device: cpu
+
+# Metadata written to probe_results.csv row
+meta:
+  encoder: resnet18
+  head: mlp
+  loss: infonce
+  scorer: none
+  dataset: chestmnist
+
+data:
+  batch_size: 256
+  num_workers: 0
+  download: false

@@ -12,7 +12,25 @@
       "Bash(git init *)",
       "Bash(git add *)",
       "Bash(git commit -m '[Stage0] repo bootstrap *)",
-      "Bash(git commit -m 'fix: unblock configs/data/ from .gitignore data/ pattern *)"
+      "Bash(git commit -m 'fix: unblock configs/data/ from .gitignore data/ pattern *)",
+      "Bash(python -c \"import medmnist; print\\(medmnist.__version__\\); from medmnist import ChestMNIST; help\\(ChestMNIST.__init__\\)\")",
+      "Bash(python -m pytest tests/test_data_splits.py tests/test_data_pipeline.py -v --no-header)",
+      "Bash(python -m venv .venv)",
+      "Bash(.venv/bin/pip install *)",
+      "Bash(.venv/Scripts/pip install *)",
+      "Bash(.venv/Scripts/python -m pip install --upgrade pip setuptools wheel)",
+      "Bash(.venv/Scripts/python -m pytest tests/test_data_splits.py tests/test_data_pipeline.py -v --no-header)",
+      "Bash(.venv/Scripts/python -c ' *)",
+      "Bash(.venv/Scripts/python -m pytest tests/test_smoke.py -v --no-header)",
+      "Bash(.venv/Scripts/python -m pytest tests/ -v --no-header)",
+      "Bash(.venv/Scripts/python -m pytest tests/test_data_splits.py tests/test_data_pipeline.py -q --no-cov)",
+      "Bash(.venv/Scripts/python -m pytest tests/test_infonce.py tests/test_mlp_head.py -v --no-cov)",
+      "Bash(.venv/Scripts/python -m pytest tests/ -q --no-cov)",
+      "Bash(.venv/Scripts/python scripts/train.py)",
+      "Bash(.venv/Scripts/python scripts/train.py --cfg job)",
+      "Bash(.venv/Scripts/python -m pytest tests/test_infonce.py -v --no-cov)",
+      "Bash(.venv/Scripts/python -m pytest tests/ --no-cov)",
+      "PowerShell(cd \"A:\\\\UNI\\\\CSE400\\\\KAN_FPCL\"; \\(Get-Content src\\\\metrics\\\\auc.py\\).Count; \\(Get-Content src\\\\metrics\\\\linear_probe.py\\).Count; \\(Get-Content src\\\\metrics\\\\knn.py\\).Count; \\(Get-Content scripts\\\\probe.py\\).Count)"
     ]
   }
 }

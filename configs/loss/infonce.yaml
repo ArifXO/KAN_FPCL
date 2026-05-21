@@ -1,0 +1,6 @@
+# configs/loss/infonce.yaml
+# SimCLR-style InfoNCE on L2-normalized embeddings (R6).
+
+_target_: src.losses.InfoNCELoss
+temperature: 0.1
+normalize_embeddings: true

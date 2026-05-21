@@ -1,0 +1,35 @@
+# configs/data/chestmnist.yaml
+# ChestMNIST data pipeline config (R6: no hardcoded hyperparams)
+
+_target_: src.data.ChestMNISTDataset
+
+# Image resolution: 28 (default MNIST-like) or 64
+size: 28
+
+# DataLoader settings
+batch_size: 256
+# num_workers=0 required on Windows to avoid multiprocessing pickle issues
+num_workers: 0
+pin_memory: false
+
+# Download dataset if not already cached
+download: true
+
+# Seed for patient_level_split utility (used on datasets with real patient IDs)
+# ChestMNIST uses medmnist pre-defined splits which are patient-level by construction
+split_seed: 42
+
+# Normalization: mean/std for single-channel grayscale
+normalize:
+  mean: [0.5]
+  std: [0.5]
+
+# Augmentation strength for contrastive training
+augmentation:
+  crop_scale_min: 0.6
+  crop_scale_max: 1.0
+  rotation_degrees: 15
+  brightness: 0.3
+  contrast: 0.3
+  horizontal_flip_prob: 0.5
+  # vertical_flip: false — vertical orientation carries diagnostic meaning in CXR

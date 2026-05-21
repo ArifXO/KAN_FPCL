@@ -1,0 +1,15 @@
+# configs/model/mlp_baseline.yaml
+# Stage 2 baseline: ResNet-18 encoder + MLP projection head.
+# Param count (head only @ 512->512->128, with BN): ~329K   (R1 reference)
+
+encoder:
+  _target_: src.models.ResNet18Encoder
+  pretrained: false
+
+head:
+  _target_: src.models.MLPHead
+  in_dim: 512
+  hidden_dim: 512
+  output_dim: 128
+  use_batch_norm: true
+  l2_normalize: true
