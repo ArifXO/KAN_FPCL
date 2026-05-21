@@ -33,7 +33,8 @@ multirun/
 *.ipynb
 
 # Data (download on demand, never commit)
-data/
+/data/
+!configs/data/
 *.h5
 *.hdf5
 *.npy
