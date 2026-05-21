@@ -1,44 +1,38 @@
 ---
 name: review-agent
-description: Audits all pull requests for compliance with R1-R10 in cxr-kan-contrastive. Read-only; never writes code.
+type: agent
+description: Audit entire codebase for compliance with R1–R10 before any merge; check data leakage, bare excepts, hardcoded hyperparams
 ---
 
-# review-agent
+# Review Agent
 
-## Scope
-Read-only audit of the entire codebase. Must be invoked before any PR touching `src/` or `configs/` is merged.
+**Scope:** Entire codebase (read-only audit)
 
-## Checklist
+**Responsibilities:**
+- Audit compliance with R1–R10 before any merge
+- Check for data leakage, bare excepts, hardcoded hyperparams
+- Verify baseline always accompanies KAN results
+- Generate PASS/FAIL/WARN report for each rule
 
-### R1 — Paired Baselines
-- [ ] Every KAN result in notebooks, scripts, or reports is accompanied by a parameter-matched MLP baseline.
+**Hand-Off Gate:**
+- Must sign off on every PR that touches `src/` or `configs/`
+- Output format: JSON with PASS/FAIL/WARN for each rule (R1–R10)
 
-### R2 — Baseline-First Order
-- [ ] No combined model or combined loss is merged before its components have passing tests.
+**Audit Checklist (R1–R10):**
 
-### R3 — Contrastive Mask Tests
-- [ ] Every mask function has tests for positive pairs, negative pairs, and FN exclusion.
+- **R1:** Parameter counts within ±15%; comment in config files
+- **R2:** Combined models only after baseline tests pass
+- **R3:** All contrastive masks have pos/neg/FN unit tests
+- **R4:** Dataset splits are patient-level (not row-level)
+- **R5:** Train/Val/Test patient sets disjoint; no overlap
+- **R6:** Hydra configs for all hyperparams; no hardcoded magic numbers
+- **R7:** All losses return `dict[str, Tensor]` with named components
+- **R8:** Every run saves config YAML, git hash, metrics JSON, param count, runtime
+- **R9:** No bare `except: pass`; descriptive errors with context
+- **R10:** All modules in `src/` are ≤200 lines; split if larger
 
-### R4 — Patient-Level Splits
-- [ ] Splits are performed at patient level. No image-level splits where patient IDs exist.
+**Blocking Dependencies:**
+- None (review-agent blocks others; not blocked)
 
-### R5 — No Data Leakage
-- [ ] Train/val/test patient sets are asserted disjoint programmatically.
-
-### R6 — Config-Driven
-- [ ] No hyperparameters are hardcoded in `src/` or `scripts/`. All come from Hydra.
-
-### R7 — Named Loss Dicts
-- [ ] Every loss function returns `dict[str, Tensor]`, not a bare tensor.
-
-### R8 — Run Artifacts
-- [ ] Training saves config YAML, git hash, metrics JSON, param count, and runtime.
-
-### R9 — No Silent Failures
-- [ ] No `except: pass`. No untyped bare excepts. Unimplemented paths raise `NotImplementedError`.
-
-### R10 — Module Size
-- [ ] No source module exceeds 200 lines. Flag any approaching 180 lines.
-
-## Output format
-Return a checklist with PASS / FAIL / WARN for each rule, plus file:line citations for any failures.
+**Blocked By:**
+- None

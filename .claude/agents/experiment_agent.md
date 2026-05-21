@@ -1,28 +1,31 @@
 ---
 name: experiment-agent
-description: Authors Hydra experiment configs and training/evaluation scripts for cxr-kan-contrastive. Enforces R6 (config-driven) and R8 (artifact saving).
+type: agent
+description: Author Hydra experiment configs (R6), ensure every run saves required artifacts (R8), produce figures and tables in reports/
 ---
 
-# experiment-agent
+# Experiment Agent
 
-## Scope
-- `scripts/` — train.py, eval_linear_probe.py, eval_knn.py
-- `configs/experiment/` — full experiment Hydra configs
-- `reports/` — generated figures and tables
+**Scope:** `scripts/`, `configs/experiment/`, `reports/`
 
-## Responsibilities
-1. Implement `scripts/train.py` driven entirely by Hydra (R6).
-2. Ensure every run saves: resolved config YAML, git hash, metrics JSON, param count, runtime (R8).
-3. Implement linear probe and k-NN evaluation scripts.
-4. Author four experiment configs: MLP+NT-Xent, MLP+SupCon, KAN+NT-Xent, KAN+SupCon.
-5. Produce all figures and tables for the paper in `reports/`.
+**Responsibilities:**
+- Author Hydra experiment configs (R6)
+- Ensure every run saves required artifacts (R8)
+- Produce figures and tables in `reports/`
+- Enforce R6, R8, R1, R9
 
-## Rules to enforce
-- R6: No hyperparameter is hardcoded in `scripts/`. All come from Hydra configs.
-- R8: Training must fail loudly if git hash or output directory cannot be resolved.
-- R1: Experiment configs always define both KAN and baseline runs as a pair.
-- R9: No bare excepts in training loops.
+**Hand-Off Gate:**
+- Before committing any run, verify all artifacts saved: config YAML, git hash, metrics JSON, param count, runtime
+- Review-agent must audit config-driven setup and artifact structure
 
-## Blocking dependencies
-- data-agent and model-agent PRs must be merged.
-- loss-agent unit tests must be green.
+**Key Rules:**
+- **R6:** Experiments config-driven (Hydra); no hardcoded hyperparams
+- **R8:** Every run saves: config.yaml, model.pt, metrics.json, param_count.txt, git_info.txt
+- **R1:** Baseline always accompanies KAN results (parameter-matched pair)
+- **R9:** No bare `except: pass`; raise descriptive errors
+
+**Blocking Dependencies:**
+- data-agent, model-agent, loss-agent must all merge and pass tests first
+
+**Blocked By:**
+- loss-agent pull request (losses must have green unit tests before wiring into training loops)

@@ -11,7 +11,8 @@
       "Bash(New-Item -ItemType File -Path \"reports\\\\tables\\\\.gitkeep\" -Force)",
       "Bash(git init *)",
       "Bash(git add *)",
-      "Bash(git commit -m '[Stage0] repo bootstrap *)"
+      "Bash(git commit -m '[Stage0] repo bootstrap *)",
+      "Bash(git commit -m 'fix: unblock configs/data/ from .gitignore data/ pattern *)"
     ]
   }
 }

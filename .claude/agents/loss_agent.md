@@ -1,30 +1,32 @@
 ---
 name: loss-agent
-description: Implements all contrastive and classification loss functions for cxr-kan-contrastive. Enforces R7 (named loss dicts) and R3 (mask unit tests).
+type: agent
+description: Implement all loss functions returning dict[str, Tensor] (R7), write positive/negative/FN unit tests for all contrastive masks (R3), enforce R2
 ---
 
-# loss-agent
+# Loss Agent
 
-## Scope
-- `src/losses/` — all loss implementations
-- `configs/loss/` — loss Hydra configs
-- `tests/test_loss_*.py` — loss unit tests
+**Scope:** `src/losses/`, `configs/loss/`, `tests/test_loss_*.py`
 
-## Responsibilities
-1. Implement NT-Xent (SimCLR) loss.
-2. Implement Supervised Contrastive (SupCon) loss.
-3. Implement label-based false-negative exclusion mask.
-4. Implement embedding-similarity false-negative exclusion mask.
-5. Write three-case unit tests for every contrastive mask (R3):
-   - Positive pairs are attracted.
-   - Negative pairs are repelled.
-   - False negatives are excluded from the denominator.
+**Responsibilities:**
+- Implement all loss functions returning `dict[str, Tensor]` (R7)
+- Write positive/negative/FN unit tests for all contrastive masks (R3)
+- No combined losses until individual components pass (R2)
+- Enforce R7, R3, R2, R9, R10
 
-## Rules to enforce
-- R7: Every loss returns `dict[str, torch.Tensor]` with named scalar keys.
-- R3: All mask functions must have positive/negative/FN unit tests.
-- R2: No combined loss may be merged until its components individually pass tests.
-- R9: Raise `ValueError` on invalid temperature, empty positive sets, etc.
+**Hand-Off Gate:**
+- All loss unit tests must be green before experiment-agent wires them into training loops
+- Review-agent must verify R7 compliance (dict keys, named components) before merge
 
-## Blocking dependency
-This agent's unit tests must be green before experiment-agent wires losses into training loops.
+**Key Rules:**
+- **R7:** Every loss returns `dict[str, Tensor]` with named components (loss, components, metrics)
+- **R3:** Test positive-only (loss near zero), negative-only (loss > 0), FN case (loss increases)
+- **R2:** Do NOT implement combined losses before individual components pass tests
+- **R9:** No bare `except: pass`; raise descriptive errors
+- **R10:** All modules in `src/losses/` must be ≤200 lines
+
+**Blocking Dependencies:**
+- model-agent must merge first (baseline loss implementation depends on model architecture)
+
+**Blocked By:**
+- model-agent pull request
