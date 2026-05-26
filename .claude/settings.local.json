@@ -53,7 +53,15 @@
       "PowerShell(New-Item *)",
       "Bash(python -m pytest tests/test_data_pipeline.py tests/test_data_splits.py -v)",
       "Bash(.venv/Scripts/python -m pytest tests/test_kan_pair_scorer.py -v)",
-      "PowerShell(Get-Content *)"
+      "PowerShell(Get-Content *)",
+      "Bash(python -m pytest tests/test_smoke.py -v)",
+      "Bash(python scripts/train.py train.max_steps=5 data.download=false)",
+      "Bash(python -c \"import json; d=json.load\\(open\\('checkpoints/run_smoke_mlp_20260526-185104-cbb67a/step_metrics.json'\\)\\); print\\('num steps:', len\\(d\\)\\); print\\('keys:', list\\(d[0].keys\\(\\)\\)\\); print\\('step0:', d[0]\\)\")",
+      "Bash(python scripts/train_fn.py train.max_steps=5 data.download=false)",
+      "Bash(python scripts/train_edge.py train.max_steps=5 data.download=false)",
+      "Bash(python -c \"import json; d=json.load\\(open\\('checkpoints/run_smoke_fn_mlp_20260526-185821-a4a3f0/step_metrics.json'\\)\\); print\\('fn step0:', {k:round\\(v,3\\) if isinstance\\(v,float\\) else v for k,v in d[0].items\\(\\)}\\)\")",
+      "Bash(python -c \"import json; d=json.load\\(open\\('checkpoints/run_smoke_edge_aware_20260526-190407-0128be/step_metrics.json'\\)\\); print\\('edge keys:', list\\(d[0].keys\\(\\)\\)\\); print\\('edge step0:', {k:round\\(v,3\\) if isinstance\\(v,float\\) else v for k,v in d[0].items\\(\\)}\\)\")",
+      "Bash(python -m scripts.train train.max_steps=3 data.download=false)"
     ]
   }
 }

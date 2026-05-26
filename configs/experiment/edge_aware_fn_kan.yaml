@@ -24,6 +24,10 @@ train:
   max_steps: 200
   log_every: 10
   lr: 0.001
+  lr_min: 1.0e-6
+  grad_clip: 1.0
+  val_every: 200        # full run: validate at the start of training
+  val_max_batches: 10   # cap val cost on the large ChestMNIST val split
 
 data:
   batch_size: 8
