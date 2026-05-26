@@ -4,6 +4,20 @@ This document defines 10 inviolable scientific rules and agent configuration for
 
 ---
 
+## Dataset Scope (Current)
+- PRIMARY DATASET: ChestMNIST only (28×28, medmnist library).
+- CheXpert is NOT integrated for training yet. Do not write CheXpert-specific
+  branches in training scripts, probe.py, or analyze_geometry.py.
+- When CheXpert integration is ready, it will be added as a separate Stage 9
+  with its own configs and dataset factory branch. Until then, any CheXpert
+  config files may exist for documentation purposes but must NOT be silently
+  routed through ChestMNIST code.
+- All headline numbers during development come from ChestMNIST.
+- The playbook rule "Headlines from CheXpert only" applies to the FINAL
+  submitted thesis, not development runs.
+
+---
+
 ## **10 Scientific Rules (R1–R10)**
 
 ### **R1: Every KAN Result Pairs with Parameter-Matched MLP Baseline**

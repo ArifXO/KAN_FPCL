@@ -48,11 +48,13 @@ checkpoints/
 *.pth
 *.ckpt
 
-# Reports (generated; commit only final versions manually)
+# Reports — figures ignored, result tables tracked
 reports/figures/*.png
 reports/figures/*.pdf
-reports/tables/*.csv
 reports/tables/*.tex
+# Final result tables — explicitly tracked
+!reports/tables/*.csv
+!reports/tables/*.md
 
 # IDE
 .vscode/

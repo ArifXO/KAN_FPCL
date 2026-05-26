@@ -1,0 +1,2 @@
+run_id,encoder,head,loss,seed,alignment,uniformity,effective_rank,per_dim_std_mean,offdiag_covariance,dataset
+run_smoke_ok_s42_20260522-002517-844561,resnet18,mlp,infonce,42,0.441167,-0.771694,65.643616,0.03926,0.000443,chestmnist

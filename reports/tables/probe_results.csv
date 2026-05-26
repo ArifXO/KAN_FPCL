@@ -4,4 +4,3 @@ run_id                       , encoder , head                 , loss         , s
 20260521-200013-4f4948       , resnet18, mlp                  , fn_infonce   , mlp         , chestmnist,   42,     11499584,           0.657493,        0.586259, 0.0904  ,       86.02
 smoke_20260521-231451-2500b4 , resnet18, fastkan              , edge_aware_fn, edge_mlp_l0 , chestmnist,   42,     11539074,           0.57479 ,        0.549304, 0.076891,       13.47
 smoke_20260521-231826-f238b8 , resnet18, fastkan              , edge_aware_fn, edge_mlp_l05, chestmnist,   42,     11539074,           0.556187,        0.576477, 0.078185,       12.98
-pending_chexpert_mlp_baseline, resnet18, mlp                  , infonce      , none        , chexpert  ,   42,             ,                   ,                ,         ,         

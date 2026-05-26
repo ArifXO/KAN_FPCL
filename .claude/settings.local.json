@@ -49,7 +49,8 @@
       "PowerShell(Get-Command *)",
       "Bash(python -c \"import ast; ast.parse\\(open\\('scripts/ablate.py'\\).read\\(\\)\\); print\\('syntax ok'\\)\")",
       "Bash(python -m scripts.ablate --config-name=ablation_smoke)",
-      "Bash(python -m scripts.ablate --config-name=ablation_smoke_fail)"
+      "Bash(python -m scripts.ablate --config-name=ablation_smoke_fail)",
+      "PowerShell(New-Item *)"
     ]
   }
 }

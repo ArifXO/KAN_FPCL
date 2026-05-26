@@ -23,7 +23,7 @@ hydra:
     - file://${oc.env:PROJECT_ROOT}/configs
 
 ablate:
-  output_csv: ablation_master.csv
+  output_csv: reports/tables/ablation_master.csv
   probe_csv: reports/tables/_ablate_probe.csv
   geometry_csv: reports/tables/_ablate_geometry.csv
 
