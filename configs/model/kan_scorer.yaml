@@ -1,0 +1,15 @@
+# configs/model/kan_scorer.yaml
+# Stage 7 KAN pair scorer for H3: drop-in replacement for MLPPairScorer.
+#
+# R1 parameter parity (input_dim=128):
+#   MLPPairScorer anchor:   9,313 params  (hidden=32, num_layers=2)
+#   KANPairScorer (below):  8,972 params  (hidden=5, centers=6)
+#   Parity: 3.7%  << 15%  (R1 satisfied)
+#   NOTE: num_centers=8 gives 11,532 params (24% over) — do NOT use num_centers=8.
+
+scorer:
+  _target_: src.models.KANPairScorer
+  input_dim: 128
+  hidden_dim: 5
+  num_centers: 6
+  use_base_linear: true

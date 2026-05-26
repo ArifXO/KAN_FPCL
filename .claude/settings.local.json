@@ -51,7 +51,9 @@
       "Bash(python -m scripts.ablate --config-name=ablation_smoke)",
       "Bash(python -m scripts.ablate --config-name=ablation_smoke_fail)",
       "PowerShell(New-Item *)",
-      "Bash(python -m pytest tests/test_data_pipeline.py tests/test_data_splits.py -v)"
+      "Bash(python -m pytest tests/test_data_pipeline.py tests/test_data_splits.py -v)",
+      "Bash(.venv/Scripts/python -m pytest tests/test_kan_pair_scorer.py -v)",
+      "PowerShell(Get-Content *)"
     ]
   }
 }

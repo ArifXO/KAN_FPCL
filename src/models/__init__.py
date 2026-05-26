@@ -2,7 +2,7 @@
 
 from .encoder import ResNet18Encoder, FEATURE_DIM
 from .mlp_head import MLPHead
-from .pair_scorer import MLPPairScorer
+from .pair_scorer import MLPPairScorer, KANPairScorer
 from .edge_aware_scorer import EdgeAwarePairScorer
 
 __all__ = [
@@ -10,5 +10,6 @@ __all__ = [
     "FEATURE_DIM",
     "MLPHead",
     "MLPPairScorer",
+    "KANPairScorer",
     "EdgeAwarePairScorer",
 ]
