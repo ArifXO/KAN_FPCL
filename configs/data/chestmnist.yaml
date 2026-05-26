@@ -2,6 +2,7 @@
 # ChestMNIST data pipeline config (R6: no hardcoded hyperparams)
 
 _target_: src.data.ChestMNISTDataset
+name: chestmnist
 
 # Image resolution: 28 (default MNIST-like) or 64
 size: 28

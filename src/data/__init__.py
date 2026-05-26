@@ -1,45 +1,57 @@
 """Data pipeline entry point (R6).
 
-get_dataloader(cfg) is the single entry point for training and evaluation
-scripts. It reads all parameters from the Hydra config — no hardcoded values.
+get_dataset() and get_dataloader() are the single entry points for training
+and evaluation scripts. All dataset construction routes through get_dataset()
+— no dataset class is constructed directly outside this module.
 """
 
 from __future__ import annotations
 
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Dataset
 from omegaconf import DictConfig
 
 from .chestmnist import ChestMNISTDataset
-from .chexpert import CheXpertDataset, patient_id_from_path
 from .augmentations import (
     TwoViewTransform,
     build_contrastive_transform,
     build_eval_transform,
 )
-from .splits import patient_level_split, chexpert_patient_ids_from_paths
 
 __all__ = [
     "ChestMNISTDataset",
-    "CheXpertDataset",
-    "patient_id_from_path",
     "TwoViewTransform",
     "build_contrastive_transform",
     "build_eval_transform",
-    "patient_level_split",
-    "chexpert_patient_ids_from_paths",
+    "get_dataset",
     "get_dataloader",
 ]
+
+
+def get_dataset(data_cfg: DictConfig, split: str, transform) -> Dataset:
+    """Return the correct Dataset for data_cfg.name."""
+    name = data_cfg.name.lower()
+    if name == "chestmnist":
+        return ChestMNISTDataset(
+            split=split,
+            transform=transform,
+            download=data_cfg.get("download", False),
+            size=data_cfg.get("size", 28),
+        )
+    raise ValueError(
+        f"Unknown dataset '{name}'. Supported: ['chestmnist']. "
+        f"CheXpert is not yet integrated — see CLAUDE.md Dataset Scope."
+    )
 
 
 def get_dataloader(cfg: DictConfig) -> dict[str, DataLoader]:
     """Build train/val/test DataLoaders from a Hydra data config.
 
-    Train split uses ``TwoViewTransform`` (contrastive pairs).
+    Train split uses TwoViewTransform (contrastive pairs).
     Val/test splits use a single deterministic eval transform.
 
     Args:
-        cfg: Hydra DictConfig with keys: size, batch_size, num_workers,
-             download, normalize.mean, normalize.std, split_seed.
+        cfg: Hydra DictConfig with keys: name, size, batch_size, num_workers,
+             download, normalize.mean, normalize.std.
 
     Returns:
         dict with keys "train", "val", "test", each a DataLoader.
@@ -47,7 +59,6 @@ def get_dataloader(cfg: DictConfig) -> dict[str, DataLoader]:
     mean = list(cfg.normalize.mean)
     std = list(cfg.normalize.std)
     size = cfg.size
-    download = cfg.get("download", False)
 
     train_transform = TwoViewTransform(
         build_contrastive_transform(size=size, mean=mean, std=std)
@@ -55,15 +66,9 @@ def get_dataloader(cfg: DictConfig) -> dict[str, DataLoader]:
     eval_transform = build_eval_transform(size=size, mean=mean, std=std)
 
     datasets = {
-        "train": ChestMNISTDataset(
-            split="train", transform=train_transform, download=download, size=size
-        ),
-        "val": ChestMNISTDataset(
-            split="val", transform=eval_transform, download=download, size=size
-        ),
-        "test": ChestMNISTDataset(
-            split="test", transform=eval_transform, download=download, size=size
-        ),
+        "train": get_dataset(cfg, "train", train_transform),
+        "val": get_dataset(cfg, "val", eval_transform),
+        "test": get_dataset(cfg, "test", eval_transform),
     }
 
     loaders: dict[str, DataLoader] = {}

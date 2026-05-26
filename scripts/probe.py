@@ -23,8 +23,9 @@ import torch.nn as nn
 from hydra.utils import instantiate
 from omegaconf import DictConfig, OmegaConf
 
-from src.data import get_dataloader
-from src.data import ChestMNISTDataset, build_eval_transform
+from torch.utils.data import DataLoader
+
+from src.data import get_dataset, build_eval_transform
 from src.metrics import linear_probe, knn_eval
 from src.utils import make_run_id, set_seed
 from src.utils.param_count import count_parameters
@@ -97,16 +98,12 @@ def main(cfg: DictConfig) -> None:
 
     # Build eval-transform loaders (single view) for both train and val.
     # Cannot reuse get_dataloader() because the train split uses TwoViewTransform.
-    from torch.utils.data import DataLoader
     mean = list(cfg.data.normalize.mean)
     std = list(cfg.data.normalize.std)
     eval_tf = build_eval_transform(size=cfg.data.size, mean=mean, std=std)
-    download = cfg.data.get("download", False)
 
-    train_ds = ChestMNISTDataset(split="train", transform=eval_tf,
-                                  download=download, size=cfg.data.size)
-    val_ds = ChestMNISTDataset(split="val", transform=eval_tf,
-                                download=download, size=cfg.data.size)
+    train_ds = get_dataset(cfg.data, "train", eval_tf)
+    val_ds = get_dataset(cfg.data, "val", eval_tf)
 
     train_loader = DataLoader(train_ds, batch_size=cfg.data.batch_size,
                               shuffle=False, num_workers=cfg.data.num_workers)

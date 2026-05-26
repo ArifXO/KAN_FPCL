@@ -21,10 +21,10 @@ from omegaconf import DictConfig, OmegaConf
 from torch.utils.data import DataLoader
 
 from src.data import (
-    ChestMNISTDataset,
     TwoViewTransform,
     build_contrastive_transform,
     build_eval_transform,
+    get_dataset,
 )
 from src.metrics import (
     alignment,
@@ -71,12 +71,7 @@ def _single_loader(cfg: DictConfig, split: str) -> DataLoader:
     mean = list(cfg.data.normalize.mean)
     std = list(cfg.data.normalize.std)
     transform = build_eval_transform(size=cfg.data.size, mean=mean, std=std)
-    dataset = ChestMNISTDataset(
-        split=split,
-        transform=transform,
-        download=cfg.data.get("download", False),
-        size=cfg.data.size,
-    )
+    dataset = get_dataset(cfg.data, split, transform)
     return DataLoader(
         dataset,
         batch_size=cfg.data.batch_size,
@@ -91,12 +86,7 @@ def _pair_loader(cfg: DictConfig, split: str) -> DataLoader:
     transform = TwoViewTransform(
         build_contrastive_transform(size=cfg.data.size, mean=mean, std=std)
     )
-    dataset = ChestMNISTDataset(
-        split=split,
-        transform=transform,
-        download=cfg.data.get("download", False),
-        size=cfg.data.size,
-    )
+    dataset = get_dataset(cfg.data, split, transform)
     return DataLoader(
         dataset,
         batch_size=cfg.data.batch_size,
