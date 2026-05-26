@@ -5,18 +5,20 @@
 # under reports/tables/_ablate_*.csv so a re-run is recoverable (R8).
 #
 # To add a cell: append an entry to `cells` with:
-#   - cell_id            : unique label used in CSV + checkpoint run name
-#   - train_script       : python module path (e.g. scripts.train, scripts.train_edge)
-#   - train_config       : Hydra experiment config (e.g. edge_aware_fn_mlp)
-#   - head/loss/scorer   : *labels* written into the CSV row (not Hydra overrides)
-#   - lambda_edge        : label only — actual value must also be in `overrides`
-#   - lambda_edge_align  : label only — actual value must also be in `overrides`
+#   - cell_id            : unique snake_case label used in CSV + checkpoint run name
+#   - train_script       : python module path (e.g. scripts.train, scripts.train_fn,
+#                          scripts.train_edge)
+#   - train_config       : one of the full_*.yaml experiment configs
+#   - head / loss / scorer / lambda_edge / lambda_edge_align: CSV label fields
 #   - dataset            : label only (chestmnist | chexpert)
 #   - overrides          : extra Hydra overrides forwarded to the train script
+#                          (seed is injected by ablate.py; do NOT add seed here)
 #
 # CLAUDE.md R6 compliance: lambdas live in `overrides`, NOT hardcoded in the
-# train script. The duplicate label fields above let downstream analysis
-# group rows without re-parsing override strings.
+# train script. The duplicate label fields let downstream analysis group rows
+# without re-parsing override strings.
+#
+# CheXpert cells are NOT included here — ChestMNIST only per CLAUDE.md §Dataset Scope.
 
 hydra:
   searchpath:
@@ -30,10 +32,12 @@ ablate:
   seeds: [42, 1337, 2024]
 
   cells:
-    # H1 baseline: MLP head, plain InfoNCE.
+    # ── H1: Architecture hypothesis (KAN projector vs MLP projector) ──────────
+
+    # Cell 1 — H1 baseline: MLP projector + plain InfoNCE, no scorer.
     - cell_id: mlp_infonce
       train_script: scripts.train
-      train_config: smoke_mlp
+      train_config: full_mlp_infonce
       head: mlp
       loss: infonce
       scorer: none
@@ -42,11 +46,78 @@ ablate:
       dataset: chestmnist
       overrides: []
 
-    # H4 control: edge wiring ON, lambdas OFF (Stage 7.5 "edge_off" cell).
+    # Cell 2 — H1: FastKAN projector + plain InfoNCE, no scorer.
+    - cell_id: kan_infonce
+      train_script: scripts.train
+      train_config: full_kan_infonce
+      head: fastkan
+      loss: infonce
+      scorer: none
+      lambda_edge: 0.0
+      lambda_edge_align: 0.0
+      dataset: chestmnist
+      overrides: []
+
+    # Cell 3 — H1: Residual FastKAN projector + plain InfoNCE, no scorer.
+    - cell_id: reskan_infonce
+      train_script: scripts.train
+      train_config: full_reskan_infonce
+      head: residual_fastkan
+      loss: infonce
+      scorer: none
+      lambda_edge: 0.0
+      lambda_edge_align: 0.0
+      dataset: chestmnist
+      overrides: []
+
+    # ── H2: FN-weighted loss hypothesis ──────────────────────────────────────
+
+    # Cell 4 — H2: MLP projector + FN-weighted InfoNCE + MLP pair scorer.
+    - cell_id: mlp_fn_mlp
+      train_script: scripts.train_fn
+      train_config: full_mlp_fn_mlp
+      head: mlp
+      loss: fn_weighted
+      scorer: mlp
+      lambda_edge: 0.0
+      lambda_edge_align: 0.0
+      dataset: chestmnist
+      overrides: []
+
+    # ── H3: KAN pair scorer hypothesis ───────────────────────────────────────
+
+    # Cell 5 — H3: MLP projector + FN-weighted InfoNCE + KAN pair scorer.
+    - cell_id: mlp_fn_kan
+      train_script: scripts.train_fn
+      train_config: full_mlp_fn_kan
+      head: mlp
+      loss: fn_weighted
+      scorer: kan
+      lambda_edge: 0.0
+      lambda_edge_align: 0.0
+      dataset: chestmnist
+      overrides: []
+
+    # Cell 6 — H3+H1: ResidualKAN projector + FN-weighted + KAN scorer.
+    - cell_id: reskan_fn_kan
+      train_script: scripts.train_fn
+      train_config: full_reskan_fn_kan
+      head: residual_fastkan
+      loss: fn_weighted
+      scorer: kan
+      lambda_edge: 0.0
+      lambda_edge_align: 0.0
+      dataset: chestmnist
+      overrides: []
+
+    # ── H4: Edge signal hypothesis ────────────────────────────────────────────
+
+    # Cell 7 — H4 control: edge wiring ON, both lambdas=0.
+    # Any delta vs reskan_fn_kan comes from richer pair features, not aux losses.
     - cell_id: edge_off
       train_script: scripts.train_edge
-      train_config: edge_aware_fn_mlp
-      head: fastkan
+      train_config: full_edge_off
+      head: residual_fastkan
       loss: edge_aware_fn
       scorer: edge_mlp
       lambda_edge: 0.0
@@ -56,30 +127,30 @@ ablate:
         - loss.lambda_edge=0.0
         - loss.lambda_edge_align=0.0
 
-    # H4 treatment: edge contrastive aux ON.
+    # Cell 8 — H4 treatment A: edge contrastive aux ON (lambda_edge=0.05).
     - cell_id: edge_contrastive
       train_script: scripts.train_edge
-      train_config: edge_aware_fn_mlp
-      head: fastkan
+      train_config: full_edge_l005
+      head: residual_fastkan
       loss: edge_aware_fn
       scorer: edge_mlp
-      lambda_edge: 0.5
+      lambda_edge: 0.05
       lambda_edge_align: 0.0
       dataset: chestmnist
       overrides:
-        - loss.lambda_edge=0.5
+        - loss.lambda_edge=0.05
         - loss.lambda_edge_align=0.0
 
-    # H4 treatment: edge-align aux ON.
+    # Cell 9 — H4 treatment B: edge-align aux ON (lambda_edge_align=0.05).
     - cell_id: edge_align
       train_script: scripts.train_edge
-      train_config: edge_aware_fn_mlp
-      head: fastkan
+      train_config: full_edge_align_l005
+      head: residual_fastkan
       loss: edge_aware_fn
       scorer: edge_mlp
       lambda_edge: 0.0
-      lambda_edge_align: 0.5
+      lambda_edge_align: 0.05
       dataset: chestmnist
       overrides:
         - loss.lambda_edge=0.0
-        - loss.lambda_edge_align=0.5
+        - loss.lambda_edge_align=0.05
