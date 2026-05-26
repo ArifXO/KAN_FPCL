@@ -63,7 +63,8 @@
       "Bash(python -c \"import json; d=json.load\\(open\\('checkpoints/run_smoke_edge_aware_20260526-190407-0128be/step_metrics.json'\\)\\); print\\('edge keys:', list\\(d[0].keys\\(\\)\\)\\); print\\('edge step0:', {k:round\\(v,3\\) if isinstance\\(v,float\\) else v for k,v in d[0].items\\(\\)}\\)\")",
       "Bash(python -m scripts.train train.max_steps=3 data.download=false)",
       "Bash(python scripts/probe.py \"probe.checkpoint_dir=checkpoints/run_smoke_edge_aware_20260526-191121-851c88\")",
-      "Bash(python -c \"import csv; rows=list\\(csv.DictReader\\(open\\('reports/tables/probe_results.csv'\\)\\)\\); r=rows[-1]; print\\('per_class_auroc_linear_json:', r['per_class_auroc_linear_json'][:80]+'...'\\); print\\('n_classes_valid:', r['n_classes_valid']\\)\")"
+      "Bash(python -c \"import csv; rows=list\\(csv.DictReader\\(open\\('reports/tables/probe_results.csv'\\)\\)\\); r=rows[-1]; print\\('per_class_auroc_linear_json:', r['per_class_auroc_linear_json'][:80]+'...'\\); print\\('n_classes_valid:', r['n_classes_valid']\\)\")",
+      "Bash(python scripts/verify_configs.py)"
     ]
   }
 }

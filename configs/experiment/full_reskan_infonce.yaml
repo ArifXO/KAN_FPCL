@@ -1,0 +1,34 @@
+# configs/experiment/full_reskan_infonce.yaml
+# H1: Residual FastKAN warp, plain InfoNCE. No scorer.
+# Tests whether the residual warp improves geometry vs MLP baseline.
+
+defaults:
+  - _self_
+  - /data: chestmnist
+  - /model: residual_fastkan_warp
+  - /loss: infonce
+
+hydra:
+  searchpath:
+    - file://${oc.env:PROJECT_ROOT}/configs
+
+run:
+  name: full_reskan_infonce
+  output_root: runs
+  seed: 42
+  deterministic: false
+  device: cuda
+
+train:
+  max_steps: 10000
+  log_every: 100
+  lr: 3.0e-4
+  lr_min: 1.0e-6
+  grad_clip: 1.0
+  val_every: 500
+  val_max_batches: null
+
+data:
+  batch_size: 256
+  num_workers: 4
+  download: false

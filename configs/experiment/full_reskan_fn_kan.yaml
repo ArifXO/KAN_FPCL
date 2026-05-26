@@ -1,0 +1,35 @@
+# configs/experiment/full_reskan_fn_kan.yaml
+# H3 + H1 combined: ResidualKAN projector + FN-weighted + KAN pair scorer.
+# Tests whether KAN throughout (both head and scorer) compounds gains.
+
+defaults:
+  - _self_
+  - /data: chestmnist
+  - /model: edge_aware_kan
+  - /loss: fn_weighted_mlp
+
+hydra:
+  searchpath:
+    - file://${oc.env:PROJECT_ROOT}/configs
+
+run:
+  name: full_reskan_fn_kan
+  output_root: runs
+  seed: 42
+  deterministic: false
+  device: cuda
+
+train:
+  max_steps: 10000
+  log_every: 100
+  lr: 3.0e-4
+  lr_min: 1.0e-6
+  grad_clip: 1.0
+  val_every: 500
+  val_max_batches: null
+  lambda_pfn_reg: 0.01
+
+data:
+  batch_size: 256
+  num_workers: 4
+  download: false
