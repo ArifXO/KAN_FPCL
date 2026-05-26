@@ -31,6 +31,16 @@ from src.utils import make_run_id, set_seed
 from src.utils.param_count import count_parameters
 
 
+# ChestMNIST 14-class label names in medmnist order (index 0-13).
+# Used to name per-class AUROC keys so make_paper_tables.py can look
+# up rare classes by name rather than integer index.
+CHESTMNIST_CLASS_NAMES = [
+    "atelectasis", "cardiomegaly", "effusion", "infiltration",
+    "mass", "nodule", "pneumonia", "pneumothorax",
+    "consolidation", "edema", "emphysema", "fibrosis",
+    "pleural_thickening", "hernia",
+]
+
 _CSV_COLUMNS = [
     "run_id", "encoder", "head", "loss", "scorer", "dataset", "seed",
     "params_total", "macro_auroc_linear", "macro_auroc_knn", "mAP",
@@ -144,8 +154,13 @@ def main(cfg: DictConfig) -> None:
     runtime = time.time() - t0
     run_id = make_run_id()
 
+    names = (
+        CHESTMNIST_CLASS_NAMES
+        if cfg.data.name == "chestmnist"
+        else [str(i) for i in range(val_lbl.shape[1])]
+    )
     per_class_json = json.dumps({
-        str(i): round(v, 6)
+        names[i]: round(float(v), 6)
         for i, v in zip(valid_classes, probe_out["per_class_auroc"])
     })
 
