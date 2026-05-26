@@ -16,11 +16,8 @@ import pytest
 import torch
 from PIL import Image
 
-from src.data import (
-    CheXpertDataset,
-    chexpert_patient_ids_from_paths,
-    patient_level_split,
-)
+from src.data.chexpert import CheXpertDataset
+from src.data.splits import chexpert_patient_ids_from_paths, patient_level_split
 from src.data.chexpert import (
     LABEL_COLUMNS,
     NUM_CLASSES,

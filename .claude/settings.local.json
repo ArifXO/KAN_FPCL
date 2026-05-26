@@ -65,7 +65,9 @@
       "Bash(python scripts/probe.py \"probe.checkpoint_dir=checkpoints/run_smoke_edge_aware_20260526-191121-851c88\")",
       "Bash(python -c \"import csv; rows=list\\(csv.DictReader\\(open\\('reports/tables/probe_results.csv'\\)\\)\\); r=rows[-1]; print\\('per_class_auroc_linear_json:', r['per_class_auroc_linear_json'][:80]+'...'\\); print\\('n_classes_valid:', r['n_classes_valid']\\)\")",
       "Bash(python scripts/verify_configs.py)",
-      "Read(//mnt/a/UNI/CSE400/**)"
+      "Read(//mnt/a/UNI/CSE400/**)",
+      "PowerShell(Set-Location \"A:\\\\UNI\\\\CSE400\\\\KAN_FPCL\"; $env:PROJECT_ROOT = \"A:\\\\UNI\\\\CSE400\\\\KAN_FPCL\"; python scripts/train.py --config-name=smoke_mlp train.max_steps=5 run.seed=42 data.download=false 2>&1)",
+      "PowerShell(Set-Location \"A:\\\\UNI\\\\CSE400\\\\KAN_FPCL\"; $env:PROJECT_ROOT = \"A:\\\\UNI\\\\CSE400\\\\KAN_FPCL\"; $ckpt = \"A:\\\\UNI\\\\CSE400\\\\KAN_FPCL\\\\checkpoints\\\\run_smoke_mlp_20260526-201433-27b0e0\"; python scripts/probe.py \"probe.checkpoint_dir=$ckpt\" probe.seed=42 data.download=false 2>&1)"
     ]
   }
 }
