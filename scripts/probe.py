@@ -33,7 +33,10 @@ from src.utils.param_count import count_parameters
 
 _CSV_COLUMNS = [
     "run_id", "encoder", "head", "loss", "scorer", "dataset", "seed",
-    "params_total", "macro_auroc_linear", "macro_auroc_knn", "mAP", "runtime_sec",
+    "params_total", "macro_auroc_linear", "macro_auroc_knn", "mAP",
+    "per_class_auroc_linear_json",
+    "n_classes_valid",
+    "runtime_sec",
 ]
 
 
@@ -114,11 +117,16 @@ def main(cfg: DictConfig) -> None:
     train_emb, train_lbl = _extract_embeddings(encoder, head, train_loader, device)
     val_emb, val_lbl = _extract_embeddings(encoder, head, val_loader, device)
 
-    # Filter classes with 0 positives in val (expected on fresh model; log but don't crash).
+    # Identify zero-positive classes in val. Log explicitly; do not silently drop.
     valid_classes = [c for c in range(val_lbl.shape[1]) if val_lbl[:, c].sum() > 0]
-    if len(valid_classes) < val_lbl.shape[1]:
-        dropped = val_lbl.shape[1] - len(valid_classes)
-        print(f"[probe] Warning: dropping {dropped} classes with 0 val positives.")
+    n_classes_valid = len(valid_classes)
+    if n_classes_valid < val_lbl.shape[1]:
+        dropped_ids = [c for c in range(val_lbl.shape[1]) if val_lbl[:, c].sum() == 0]
+        print(
+            f"[probe] Warning: {len(dropped_ids)} class(es) have 0 val positives "
+            f"and are excluded from AUROC (class ids: {dropped_ids}). "
+            f"This is expected for fresh/random encoders."
+        )
 
     tr_lbl_f = train_lbl[:, valid_classes].astype(np.int32)
     vl_lbl_f = val_lbl[:, valid_classes].astype(np.int32)
@@ -136,6 +144,11 @@ def main(cfg: DictConfig) -> None:
     runtime = time.time() - t0
     run_id = make_run_id()
 
+    per_class_json = json.dumps({
+        str(i): round(v, 6)
+        for i, v in zip(valid_classes, probe_out["per_class_auroc"])
+    })
+
     row = {
         "run_id": run_id,
         "encoder": cfg.meta.encoder,
@@ -148,6 +161,8 @@ def main(cfg: DictConfig) -> None:
         "macro_auroc_linear": round(probe_out["macro_auroc"], 6),
         "macro_auroc_knn": round(knn_out["macro_auroc"], 6),
         "mAP": round(probe_out["mAP"], 6),
+        "per_class_auroc_linear_json": per_class_json,
+        "n_classes_valid": n_classes_valid,
         "runtime_sec": round(runtime, 2),
     }
 
@@ -156,7 +171,8 @@ def main(cfg: DictConfig) -> None:
 
     print(f"[probe] macro_auroc_linear={row['macro_auroc_linear']:.4f}  "
           f"macro_auroc_knn={row['macro_auroc_knn']:.4f}  "
-          f"mAP={row['mAP']:.4f}  runtime={runtime:.1f}s")
+          f"mAP={row['mAP']:.4f}  "
+          f"n_classes_valid={n_classes_valid}  runtime={runtime:.1f}s")
     print(f"[probe] Row appended to {csv_path}")
 
 
