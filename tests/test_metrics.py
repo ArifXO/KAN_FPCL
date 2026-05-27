@@ -98,6 +98,13 @@ def test_auc_zero_positives_raises():
         multilabel_auc(scores, labels)
 
 
+def test_auc_all_positive_raises():
+    scores = np.random.rand(50, 3).astype(np.float32)
+    labels = np.ones((50, 3), dtype=np.int32)  # all positive
+    with pytest.raises(ValueError, match="0 negative"):
+        multilabel_auc(scores, labels)
+
+
 def test_auc_shape_mismatch_raises():
     with pytest.raises(ValueError, match="same shape"):
         multilabel_auc(np.zeros((10, 3)), np.zeros((10, 4)))

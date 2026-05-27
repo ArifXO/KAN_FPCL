@@ -35,6 +35,12 @@ def multilabel_auc(
             f"Classes {zero_pos_classes} have 0 positive examples. "
             "AUROC is undefined. Filter or merge these classes first."
         )
+    zero_neg_classes = [c for c in range(n_classes) if labels[:, c].sum() == labels.shape[0]]
+    if zero_neg_classes:
+        raise ValueError(
+            f"Classes {zero_neg_classes} have 0 negative examples (all positive) in val set. "
+            "AUROC is undefined. Filter or merge these classes first."
+        )
 
     per_class_auroc = roc_auc_score(labels, scores, average=None)
     macro_auroc = float(np.mean(per_class_auroc))

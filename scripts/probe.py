@@ -140,12 +140,18 @@ def main(cfg: DictConfig) -> None:
     val_emb, val_lbl = _extract_embeddings(encoder, head, val_loader, device)
 
     # Identify zero-positive classes in val. Log explicitly; do not silently drop.
-    valid_classes = [c for c in range(val_lbl.shape[1]) if val_lbl[:, c].sum() > 0]
+    valid_classes = [
+        c for c in range(val_lbl.shape[1])
+        if 0 < val_lbl[:, c].sum() < val_lbl.shape[0]
+    ]
     n_classes_valid = len(valid_classes)
     if n_classes_valid < val_lbl.shape[1]:
-        dropped_ids = [c for c in range(val_lbl.shape[1]) if val_lbl[:, c].sum() == 0]
+        dropped_ids = [
+            c for c in range(val_lbl.shape[1])
+            if val_lbl[:, c].sum() == 0 or val_lbl[:, c].sum() == val_lbl.shape[0]
+        ]
         print(
-            f"[probe] Warning: {len(dropped_ids)} class(es) have 0 val positives "
+            f"[probe] Warning: {len(dropped_ids)} class(es) have 0 val positives or 0 val negatives "
             f"and are excluded from AUROC (class ids: {dropped_ids}). "
             f"This is expected for fresh/random encoders."
         )
