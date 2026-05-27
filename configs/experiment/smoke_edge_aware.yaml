@@ -16,7 +16,7 @@ hydra:
 
 run:
   name: smoke_edge_aware
-  output_root: checkpoints
+  output_root: runs
   seed: 42
   deterministic: false
   device: cpu

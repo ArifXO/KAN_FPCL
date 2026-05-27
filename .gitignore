@@ -42,19 +42,17 @@ multirun/
 *.pkl
 *.pickle
 
-# Model checkpoints
-checkpoints/
+# All run artifacts (ephemeral — checkpoints, metrics, plots, result CSVs)
+runs/
+!runs/results/.gitkeep
+!runs/tables/.gitkeep
+!runs/figures/.gitkeep
+!runs/figures/loss_curves/.gitkeep
+!runs/figures/umap/.gitkeep
+!runs/figures/geometry/.gitkeep
 *.pt
 *.pth
 *.ckpt
-
-# Reports — figures ignored, result tables tracked
-reports/figures/*.png
-reports/figures/*.pdf
-reports/tables/*.tex
-# Final result tables — explicitly tracked
-!reports/tables/*.csv
-!reports/tables/*.md
 
 # IDE
 .vscode/

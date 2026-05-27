@@ -20,10 +20,11 @@ PROJECT_ROOT = Path(os.environ.get("PROJECT_ROOT", Path(__file__).resolve().pare
 # ChestMNIST: rarest 3 classes by frequency (hernia ~0.2%, emphysema ~2%, fibrosis ~1.5%)
 RARE_CLASSES = ("hernia", "emphysema", "fibrosis")
 
+_RUNS_RESULTS = PROJECT_ROOT / "runs" / "results"
 REQUIRED = {
-    "probe": PROJECT_ROOT / "reports" / "tables" / "probe_results.csv",
-    "ablation": PROJECT_ROOT / "reports" / "tables" / "ablation_master.csv",
-    "geometry": PROJECT_ROOT / "reports" / "tables" / "geometry.csv",
+    "probe": _RUNS_RESULTS / "probe_results.csv",
+    "ablation": _RUNS_RESULTS / "ablation_master.csv",
+    "geometry": _RUNS_RESULTS / "geometry.csv",
 }
 
 CORE_COLUMNS = {
@@ -68,9 +69,9 @@ def _check_required_inputs() -> None:
 
 def _parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--input", default="reports/tables/ablation_master.csv",
+    p.add_argument("--input", default="runs/results/ablation_master.csv",
                    help="Ablation CSV path.")
-    p.add_argument("--output-dir", default="reports/tables", help="Directory for tables.")
+    p.add_argument("--output-dir", default="runs/tables", help="Directory for tables.")
     p.add_argument("--include-smoke", action="store_true", help="Keep smoke_* rows.")
     p.add_argument("--include-failed", action="store_true", help="Keep FAILED rows.")
     return p.parse_args()

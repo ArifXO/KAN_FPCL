@@ -1,0 +1,54 @@
+[
+  {
+    "step": 0,
+    "lr": 0.0008536998372026805,
+    "loss": 6.2685675621032715,
+    "pos_sim_mean": 0.34938254952430725,
+    "neg_sim_mean": 0.3141302168369293,
+    "p_fn_mean": NaN,
+    "p_fn_max": NaN,
+    "downweighted_fraction": NaN,
+    "fn_loss": NaN,
+    "edge_contrastive_loss": NaN,
+    "edge_align_loss": NaN
+  },
+  {
+    "step": 1,
+    "lr": 0.0005005000000000001,
+    "loss": 6.221993923187256,
+    "pos_sim_mean": 0.43826720118522644,
+    "neg_sim_mean": 0.3843042850494385,
+    "p_fn_mean": NaN,
+    "p_fn_max": NaN,
+    "downweighted_fraction": NaN,
+    "fn_loss": NaN,
+    "edge_contrastive_loss": NaN,
+    "edge_align_loss": NaN
+  },
+  {
+    "step": 2,
+    "lr": 0.00014730016279731955,
+    "loss": 5.842970371246338,
+    "pos_sim_mean": 0.5615567564964294,
+    "neg_sim_mean": 0.4575194716453552,
+    "p_fn_mean": NaN,
+    "p_fn_max": NaN,
+    "downweighted_fraction": NaN,
+    "fn_loss": NaN,
+    "edge_contrastive_loss": NaN,
+    "edge_align_loss": NaN
+  },
+  {
+    "step": 3,
+    "lr": 1e-06,
+    "loss": 5.791899681091309,
+    "pos_sim_mean": 0.605461061000824,
+    "neg_sim_mean": 0.48571622371673584,
+    "p_fn_mean": NaN,
+    "p_fn_max": NaN,
+    "downweighted_fraction": NaN,
+    "fn_loss": NaN,
+    "edge_contrastive_loss": NaN,
+    "edge_align_loss": NaN
+  }
+]

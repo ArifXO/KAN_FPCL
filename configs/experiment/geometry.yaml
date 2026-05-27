@@ -12,7 +12,7 @@ hydra:
 
 geometry:
   checkpoint_dir: ""          # path to run_<id>/ directory (required)
-  output_csv: reports/tables/geometry.csv
+  output_csv: runs/results/geometry.csv
   eval_splits: [train, val, test]
   alignment_split: train
   max_samples: 2048           # set null for full pdist; keeps smoke runs bounded

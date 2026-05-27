@@ -1,4 +1,8 @@
 # configs/data/chexpert.yaml
+# DEFERRED — CheXpert is not active for training/probe/geometry.
+# See CLAUDE.md Dataset Scope. Do not reference this config from
+# any experiment/*.yaml until Stage 9 is deliberately activated.
+#
 # CheXpert pipeline (Stage 9). R6: no hardcoded hyperparams.
 #
 # CheXpert is NOT bundled with the repo. Set `root` to the directory that

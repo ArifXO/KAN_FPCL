@@ -7,9 +7,9 @@ hydra:
     - file://${oc.env:PROJECT_ROOT}/configs
 
 ablate:
-  output_csv: reports/tables/_ablate_smoke_master.csv
-  probe_csv: reports/tables/_ablate_smoke_probe.csv
-  geometry_csv: reports/tables/_ablate_smoke_geometry.csv
+  output_csv: runs/results/_ablate_smoke_master.csv
+  probe_csv: runs/results/_ablate_smoke_probe.csv
+  geometry_csv: runs/results/_ablate_smoke_geometry.csv
 
   seeds: [42]
 

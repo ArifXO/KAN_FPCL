@@ -67,7 +67,15 @@
       "Bash(python scripts/verify_configs.py)",
       "Read(//mnt/a/UNI/CSE400/**)",
       "PowerShell(Set-Location \"A:\\\\UNI\\\\CSE400\\\\KAN_FPCL\"; $env:PROJECT_ROOT = \"A:\\\\UNI\\\\CSE400\\\\KAN_FPCL\"; python scripts/train.py --config-name=smoke_mlp train.max_steps=5 run.seed=42 data.download=false 2>&1)",
-      "PowerShell(Set-Location \"A:\\\\UNI\\\\CSE400\\\\KAN_FPCL\"; $env:PROJECT_ROOT = \"A:\\\\UNI\\\\CSE400\\\\KAN_FPCL\"; $ckpt = \"A:\\\\UNI\\\\CSE400\\\\KAN_FPCL\\\\checkpoints\\\\run_smoke_mlp_20260526-201433-27b0e0\"; python scripts/probe.py \"probe.checkpoint_dir=$ckpt\" probe.seed=42 data.download=false 2>&1)"
+      "PowerShell(Set-Location \"A:\\\\UNI\\\\CSE400\\\\KAN_FPCL\"; $env:PROJECT_ROOT = \"A:\\\\UNI\\\\CSE400\\\\KAN_FPCL\"; $ckpt = \"A:\\\\UNI\\\\CSE400\\\\KAN_FPCL\\\\checkpoints\\\\run_smoke_mlp_20260526-201433-27b0e0\"; python scripts/probe.py \"probe.checkpoint_dir=$ckpt\" probe.seed=42 data.download=false 2>&1)",
+      "Bash(mkdir -p _archive_old_results)",
+      "Bash(mv reports/tables/*.csv _archive_old_results/)",
+      "Bash(mv reports/tables/*.md _archive_old_results/)",
+      "Bash(mv checkpoints *)",
+      "Bash(.venv/Scripts/python -m pytest tests/ -q)",
+      "Bash(git stash *)",
+      "Bash(.venv/Scripts/python -m pytest tests/test_smoke.py::test_todo_all_unchecked -q)",
+      "Bash(python -m pytest tests/test_smoke.py -q)"
     ]
   }
 }

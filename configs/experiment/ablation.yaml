@@ -25,9 +25,9 @@ hydra:
     - file://${oc.env:PROJECT_ROOT}/configs
 
 ablate:
-  output_csv: reports/tables/ablation_master.csv
-  probe_csv: reports/tables/_ablate_probe.csv
-  geometry_csv: reports/tables/_ablate_geometry.csv
+  output_csv: runs/results/ablation_master.csv
+  probe_csv: runs/results/_ablate_probe.csv
+  geometry_csv: runs/results/_ablate_geometry.csv
 
   seeds: [42, 1337, 2024]
 
@@ -114,9 +114,9 @@ ablate:
 
     # Cell 7 — H4 control: edge wiring ON, both lambdas=0.
     # Any delta vs reskan_fn_kan comes from richer pair features, not aux losses.
-    - cell_id: edge_off
+    - cell_id: edge_scorer_no_aux
       train_script: scripts.train_edge
-      train_config: full_edge_off
+      train_config: full_edge_scorer_no_aux
       head: residual_fastkan
       loss: edge_aware_fn
       scorer: edge_mlp
