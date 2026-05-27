@@ -11,6 +11,7 @@
 # Cell 7 edge_scorer_no_aux -> edge_aware_mlp.yaml          -> FastKANProjector + EdgeAwareMLP    ✓
 # Cell 8 edge_contrastive   -> edge_aware_mlp.yaml          -> FastKANProjector + EdgeAwareMLP    ✓
 # Cell 9 edge_align         -> edge_aware_mlp.yaml          -> FastKANProjector + EdgeAwareMLP    ✓
+# Cell 10 zonly_fn          -> edge_aware_mlp_zonly.yaml    -> FastKANProjector + EdgeAwareMLP(z-only) ✓
 # Each cell triggers: train -> probe -> analyze_geometry, with one merged
 # row appended to ablation_master.csv. Per-step intermediate CSVs are kept
 # under reports/tables/_ablate_*.csv so a re-run is recoverable (R8).
@@ -122,9 +123,14 @@ ablate:
       overrides: []
 
     # ── H4: Edge signal hypothesis ────────────────────────────────────────────
+    # H4 decomposition (4 rows):
+    #   Cell 10: zonly_fn           — scorer sees z-features ONLY (true baseline)
+    #   Cell 7:  edge_scorer_no_aux — scorer sees z + edge features, λ=0 (feature effect)
+    #   Cell 8:  edge_contrastive   — scorer sees z + edge features, λ_edge=0.05
+    #   Cell 9:  edge_align         — scorer sees z + edge features, λ_edge_align=0.05
 
     # Cell 7 — H4 control: edge wiring ON, both lambdas=0.
-    # Any delta vs reskan_fn_kan comes from richer pair features, not aux losses.
+    # Any delta vs zonly_fn comes from richer pair features (edge in scorer), not aux losses.
     - cell_id: edge_scorer_no_aux
       train_script: scripts.train_edge
       train_config: full_edge_scorer_no_aux
@@ -165,3 +171,19 @@ ablate:
       overrides:
         - loss.lambda_edge=0.0
         - loss.lambda_edge_align=0.05
+
+    # Cell 10 — H4 true z-only baseline: no edge features in scorer.
+    # This is the REAL baseline for H4. Cells 7-9 all have edge features;
+    # comparing them against this cell isolates the edge-signal contribution.
+    - cell_id: zonly_fn
+      train_script: scripts.train_edge
+      train_config: full_zonly_fn
+      head: fastkan
+      loss: edge_aware_fn
+      scorer: mlp_zonly
+      lambda_edge: 0.0
+      lambda_edge_align: 0.0
+      dataset: chestmnist
+      overrides:
+        - loss.lambda_edge=0.0
+        - loss.lambda_edge_align=0.0

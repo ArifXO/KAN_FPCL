@@ -1,0 +1,32 @@
+# configs/model/edge_aware_mlp_zonly.yaml
+# H4 true z-only control: FastKAN projector + EdgeAware scorer WITHOUT
+# edge features. The scorer sees only [cos, L2, |z_i-z_k|, z_i*z_k].
+# This is the valid baseline for H4 — any improvement from adding
+# edge features (use_edge_features=true) is attributable to H4.
+
+encoder:
+  _target_: src.models.ResNet18Encoder
+  pretrained: false
+
+head:
+  _target_: src.models.kan.FastKANProjector
+  input_dim: 512
+  hidden_dim: 64
+  output_dim: 128
+  num_centers: 8
+  grid_min: -2.0
+  grid_max: 2.0
+  use_base_linear: true
+  base_activation: silu
+  rbf_init_scale: 0.1
+  normalize: true
+
+scorer:
+  _target_: src.models.EdgeAwarePairScorer
+  input_dim: 128
+  edge_dim: 256
+  hidden_dim: 16
+  num_layers: 2
+  activation: relu
+  use_edge_features: false     # <-- TRUE Z-ONLY: no edge features
+  scorer_type: mlp

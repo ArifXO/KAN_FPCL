@@ -1,0 +1,40 @@
+# configs/experiment/full_zonly_fn.yaml
+# H4 true z-only control: EdgeAwarePairScorer with use_edge_features=false.
+# Scorer sees only z-derived pair features (cos, L2, |diff|, product).
+# No edge fingerprints, no auxiliary edge losses.
+
+defaults:
+  - _self_
+  - /data: chestmnist
+  - /model: edge_aware_mlp_zonly
+  - /loss: edge_aware
+
+hydra:
+  searchpath:
+    - file://${oc.env:PROJECT_ROOT}/configs
+
+run:
+  name: full_zonly_fn
+  output_root: runs
+  seed: 42
+  deterministic: false
+  device: cuda
+
+train:
+  max_steps: 10000
+  log_every: 100
+  lr: 3.0e-4
+  lr_min: 1.0e-6
+  grad_clip: 1.0
+  val_every: 500
+  val_max_batches: null
+  lambda_pfn_reg: 0.01
+
+data:
+  batch_size: 256
+  num_workers: 4
+  download: false
+
+loss:
+  lambda_edge: 0.0
+  lambda_edge_align: 0.0
