@@ -33,7 +33,8 @@ from omegaconf import DictConfig
 _COLUMNS = [
     "cell_id", "head", "loss", "scorer", "lambda_edge", "lambda_edge_align",
     "dataset", "seed", "params_total", "macro_auroc_linear", "macro_auroc_knn",
-    "mAP", "alignment", "uniformity", "effective_rank", "runtime_sec", "status",
+    "mAP", "per_class_auroc_linear_json", "alignment", "uniformity", "effective_rank",
+    "runtime_sec", "status",
 ]
 
 
@@ -153,6 +154,7 @@ def _run_cell(
             "macro_auroc_linear": probe_row.get("macro_auroc_linear", ""),
             "macro_auroc_knn": probe_row.get("macro_auroc_knn", ""),
             "mAP": probe_row.get("mAP", ""),
+            "per_class_auroc_linear_json": probe_row.get("per_class_auroc_linear_json", ""),
             "alignment": geom_row.get("alignment", ""),
             "uniformity": geom_row.get("uniformity", ""),
             "effective_rank": geom_row.get("effective_rank", ""),

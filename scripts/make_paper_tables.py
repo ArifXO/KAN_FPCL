@@ -13,6 +13,8 @@ import math
 import os
 from pathlib import Path
 
+import numpy as np
+
 import pandas as pd
 
 PROJECT_ROOT = Path(os.environ.get("PROJECT_ROOT", Path(__file__).resolve().parents[1]))
@@ -314,6 +316,18 @@ def _write_table(path: Path, title: str, table: pd.DataFrame) -> None:
     path.write_text(text, encoding="utf-8")
 
 
+def _extract_rare_auroc(json_str: str) -> float:
+    """Mean AUROC across rare classes from per_class_auroc_linear_json."""
+    if not json_str or pd.isna(json_str):
+        return float("nan")
+    try:
+        data = json.loads(json_str)
+        vals = [data[c] for c in RARE_CLASSES if c in data]
+        return float(np.mean(vals)) if vals else float("nan")
+    except (json.JSONDecodeError, KeyError):
+        return float("nan")
+
+
 def _build_tables(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
     # Each hypothesis isolates EXACTLY ONE experimental factor:
     # H1: head architecture     (fixed: InfoNCE loss, no scorer)
@@ -362,6 +376,11 @@ def _build_tables(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
     # H2: loss function — MLP head rows only (InfoNCE vs FN-weighted).
     h2 = _cell_slice(["mlp_infonce", "mlp_fn_mlp"])
     if not h2.empty:
+        if "per_class_auroc_linear_json" in h2.columns:
+            h2["rare_auroc"] = h2["per_class_auroc_linear_json"].apply(_extract_rare_auroc)
+            rare_src = "rare_auroc"
+        else:
+            rare_src = "rare_disease_auroc"
         tables["table_h2.md"] = (
             h2.groupby("cell_id", observed=True)
             .agg(
@@ -370,7 +389,7 @@ def _build_tables(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
                 scorer=("scorer", "first"),
                 n_seeds=("seed", "nunique"),
                 macro_auroc=("macro_auroc", _auroc),
-                rare_disease_auroc=("rare_disease_auroc", _auroc),
+                rare_disease_auroc=(rare_src, _auroc),
                 mAP=("mAP", _auroc),
             )
             .reset_index()
