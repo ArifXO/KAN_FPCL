@@ -1,5 +1,16 @@
 # configs/experiment/ablation.yaml
 # Stage 10: cell × seed ablation matrix orchestrated by scripts/ablate.py.
+#
+# LABEL VERIFICATION (check these match actual model configs):
+# Cell 1 mlp_infonce       -> mlp_baseline.yaml           -> MLPHead                            ✓
+# Cell 2 kan_infonce        -> kan_head.yaml                -> FastKANProjector                   ✓
+# Cell 3 reskan_infonce     -> residual_fastkan_warp        -> ResidualFastKANWarp                ✓
+# Cell 4 mlp_fn_mlp         -> mlp_scorer.yaml              -> MLPHead + MLPPairScorer            ✓
+# Cell 5 mlp_fn_kan         -> kan_scorer.yaml               -> MLPHead + KANPairScorer            ✓
+# Cell 6 kan_fn_kan         -> kan_head_with_kan_scorer     -> FastKANProjector + KANPairScorer   ✓
+# Cell 7 edge_scorer_no_aux -> edge_aware_mlp.yaml          -> FastKANProjector + EdgeAwareMLP    ✓
+# Cell 8 edge_contrastive   -> edge_aware_mlp.yaml          -> FastKANProjector + EdgeAwareMLP    ✓
+# Cell 9 edge_align         -> edge_aware_mlp.yaml          -> FastKANProjector + EdgeAwareMLP    ✓
 # Each cell triggers: train -> probe -> analyze_geometry, with one merged
 # row appended to ablation_master.csv. Per-step intermediate CSVs are kept
 # under reports/tables/_ablate_*.csv so a re-run is recoverable (R8).
@@ -117,7 +128,7 @@ ablate:
     - cell_id: edge_scorer_no_aux
       train_script: scripts.train_edge
       train_config: full_edge_scorer_no_aux
-      head: residual_fastkan
+      head: fastkan
       loss: edge_aware_fn
       scorer: edge_mlp
       lambda_edge: 0.0
@@ -131,7 +142,7 @@ ablate:
     - cell_id: edge_contrastive
       train_script: scripts.train_edge
       train_config: full_edge_l005
-      head: residual_fastkan
+      head: fastkan
       loss: edge_aware_fn
       scorer: edge_mlp
       lambda_edge: 0.05
@@ -145,7 +156,7 @@ ablate:
     - cell_id: edge_align
       train_script: scripts.train_edge
       train_config: full_edge_align_l005
-      head: residual_fastkan
+      head: fastkan
       loss: edge_aware_fn
       scorer: edge_mlp
       lambda_edge: 0.0
