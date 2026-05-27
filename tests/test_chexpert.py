@@ -343,3 +343,52 @@ def test_patient_extraction_round_trips_through_splits(synthetic_root):
         image_size=16,
     )
     assert chexpert_patient_ids_from_paths(ds.paths) == ds.patient_ids
+
+
+# ---------------------------------------------------------------------------
+# __getitem__: doubled-prefix fallback (R9)
+# ---------------------------------------------------------------------------
+
+
+def test_getitem_strips_doubled_prefix(tmp_path):
+    """root=CheXpert-v1.0/, CSV paths start with CheXpert-v1.0/ -> strip and load."""
+    dataset_dir = tmp_path / "CheXpert-v1.0"
+    rel = "CheXpert-v1.0/train/patient00001/study1/view1_frontal.jpg"
+    # Image lives at dataset_dir/train/...
+    _write_image(dataset_dir, "train/patient00001/study1/view1_frontal.jpg", size=16)
+    rows = [
+        _row(rel, "Frontal", _label_row({"No Finding": "1.0"})),
+    ]
+    _write_manifest(dataset_dir, rows)
+    ds = CheXpertDataset(
+        root=dataset_dir,
+        split="train",
+        view="frontal",
+        uncertainty_policy="ignore",
+        image_size=16,
+    )
+    img, label, pid = ds[0]
+    assert img.shape == (1, 16, 16)
+    assert pid == "patient00001"
+
+
+def test_getitem_filenotfounderror_shows_both_paths(tmp_path):
+    """Missing image -> FileNotFoundError listing both attempted paths."""
+    rel = "CheXpert-v1.0/train/patient00001/study1/view1_frontal.jpg"
+    rows = [
+        _row(rel, "Frontal", _label_row({"No Finding": "1.0"})),
+    ]
+    _write_manifest(tmp_path, rows)
+    ds = CheXpertDataset(
+        root=tmp_path,
+        split="train",
+        view="frontal",
+        uncertainty_policy="ignore",
+        image_size=16,
+    )
+    with pytest.raises(FileNotFoundError) as exc_info:
+        ds[0]
+    msg = str(exc_info.value)
+    assert "Tried:" in msg
+    assert "1." in msg
+    assert "2." in msg

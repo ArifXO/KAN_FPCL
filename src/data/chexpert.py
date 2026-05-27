@@ -180,6 +180,22 @@ class CheXpertDataset(Dataset):
     def __getitem__(self, idx: int) -> tuple[Tensor, Tensor, str]:
         path, pid, labels = self._records[idx]
         full_path = self.root / path if not Path(path).is_absolute() else Path(path)
+        if not full_path.exists():
+            parts = Path(path).parts
+            if len(parts) > 1:
+                stripped = Path(*parts[1:])
+                alt_path = self.root / stripped
+                if alt_path.exists():
+                    full_path = alt_path
+                else:
+                    raise FileNotFoundError(
+                        f"CheXpert image not found. Tried:\n"
+                        f"  1. {self.root / path}\n"
+                        f"  2. {alt_path}\n"
+                        f"Check that root='{self.root}' is correct."
+                    )
+            else:
+                raise FileNotFoundError(f"CheXpert image not found: {full_path}")
         with Image.open(full_path) as im:
             img = im.convert("L")
             if (img.width, img.height) != (self.image_size, self.image_size):
