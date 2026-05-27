@@ -44,7 +44,7 @@ def snapshot_cpu_state(model: torch.nn.Module) -> dict:
     return {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
 
 
-def base_step_metrics(step: int, lr: float, out: dict) -> dict:
+def base_step_metrics(step: int, lr: float, out: dict, epoch: int = 0) -> dict:
     """One per-step row from a loss dict; NaN for keys a loss does not emit.
 
     Single source of truth for the R7 logging keys shared by all three train
@@ -52,6 +52,7 @@ def base_step_metrics(step: int, lr: float, out: dict) -> dict:
     """
     return {
         "step": step,
+        "epoch": epoch,
         "lr": lr,
         "loss": float(out["loss"].detach()),
         "pos_sim_mean": float(out.get("pos_sim_mean", float("nan"))),

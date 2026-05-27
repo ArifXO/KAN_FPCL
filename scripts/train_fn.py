@@ -91,60 +91,63 @@ def main(cfg: DictConfig) -> None:
     head.train()
     scorer.train()
     step = 0
-    for (v1, v2), _labels, _pids in train_loader:
-        if step >= cfg.train.max_steps:
-            break
-        v1, v2 = v1.to(device), v2.to(device)
-        z = head(encoder(torch.cat([v1, v2], dim=0)))
+    epoch = 0
+    while step < cfg.train.max_steps:
+        epoch += 1
+        for (v1, v2), _labels, _pids in train_loader:
+            if step >= cfg.train.max_steps:
+                break
+            v1, v2 = v1.to(device), v2.to(device)
+            z = head(encoder(torch.cat([v1, v2], dim=0)))
 
-        batch = v1.shape[0]
-        p_fn = scorer(z[:batch].detach())  # scorer trained via loss grad below
+            batch = v1.shape[0]
+            p_fn = scorer(z[:batch].detach())  # scorer trained via loss grad below
 
-        out = loss_fn(z, p_fn)
-        contrastive_loss = out["loss"]
-        p_fn_reg = lambda_pfn_reg * p_fn.mean()
-        total_loss = contrastive_loss + p_fn_reg
+            out = loss_fn(z, p_fn)
+            contrastive_loss = out["loss"]
+            p_fn_reg = lambda_pfn_reg * p_fn.mean()
+            total_loss = contrastive_loss + p_fn_reg
 
-        optim.zero_grad()
-        total_loss.backward()
-        torch.nn.utils.clip_grad_norm_(params, max_norm=grad_clip)
-        optim.step()
-        scheduler.step()
+            optim.zero_grad()
+            total_loss.backward()
+            torch.nn.utils.clip_grad_norm_(params, max_norm=grad_clip)
+            optim.step()
+            scheduler.step()
 
-        losses.append(float(total_loss.item()))
-        step_dict = base_step_metrics(step, scheduler.get_last_lr()[0], out)
-        step_dict["p_fn_reg_loss"] = float(p_fn_reg.detach())
-        step_dict["total_loss"] = float(total_loss.detach())
-        step_dict["contrastive_loss"] = float(contrastive_loss.detach())
-        step_metrics.append(step_dict)
+            losses.append(float(total_loss.item()))
+            step_dict = base_step_metrics(step, scheduler.get_last_lr()[0], out, epoch=epoch)
+            step_dict["p_fn_reg_loss"] = float(p_fn_reg.detach())
+            step_dict["total_loss"] = float(total_loss.detach())
+            step_dict["contrastive_loss"] = float(contrastive_loss.detach())
+            step_metrics.append(step_dict)
 
-        if step % cfg.train.log_every == 0:
-            print(
-                f"[step {step}] loss={total_loss.item():.4f} "
-                f"pos_sim={out['pos_sim_mean'].item():.4f} "
-                f"neg_sim={out['neg_sim_mean'].item():.4f} "
-                f"p_fn_mean={out['p_fn_mean'].item():.4f} "
-                f"p_fn_max={out['p_fn_max'].item():.4f} "
-                f"downweighted={out['downweighted_fraction'].item():.4f} "
-                f"lr={scheduler.get_last_lr()[0]:.2e}"
-            )
+            if step % cfg.train.log_every == 0:
+                print(
+                    f"[step {step}] loss={total_loss.item():.4f} "
+                    f"pos_sim={out['pos_sim_mean'].item():.4f} "
+                    f"neg_sim={out['neg_sim_mean'].item():.4f} "
+                    f"p_fn_mean={out['p_fn_mean'].item():.4f} "
+                    f"p_fn_max={out['p_fn_max'].item():.4f} "
+                    f"downweighted={out['downweighted_fraction'].item():.4f} "
+                    f"lr={scheduler.get_last_lr()[0]:.2e}"
+                )
 
-        if step % val_every == 0:
-            encoder.eval()
-            head.eval()
-            scorer.eval()
-            val_loss = run_validation(val_loader, device, val_forward, val_max_batches, val_seed)
-            encoder.train()
-            head.train()
-            scorer.train()
-            val_loss_curve.append({"step": step, "val_loss": val_loss})
-            if val_loss < best_val_loss:
-                best_val_loss = val_loss
-                best_val_step = step
-                best_state = snapshot_cpu_state(full_model)
-            print(f"[val step {step}] val_loss={val_loss:.4f} best={best_val_loss:.4f}")
+            if step % val_every == 0:
+                encoder.eval()
+                head.eval()
+                scorer.eval()
+                val_loss = run_validation(val_loader, device, val_forward, val_max_batches, val_seed)
+                encoder.train()
+                head.train()
+                scorer.train()
+                val_loss_curve.append({"step": step, "val_loss": val_loss})
+                if val_loss < best_val_loss:
+                    best_val_loss = val_loss
+                    best_val_step = step
+                    best_state = snapshot_cpu_state(full_model)
+                print(f"[val step {step}] val_loss={val_loss:.4f} best={best_val_loss:.4f}")
 
-        step += 1
+            step += 1
 
     runtime = time.time() - t0
 
@@ -163,8 +166,9 @@ def main(cfg: DictConfig) -> None:
         "best_val_step": best_val_step,
         "train_time_sec": runtime,
         "steps": step,
+        "total_epochs": epoch,
         "run_id": run_id,
-        "seeds": int(cfg.run.seed),
+        "seed": int(cfg.run.seed),
     }
 
     save_run_artifacts(

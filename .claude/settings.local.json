@@ -82,7 +82,10 @@
       "Bash(ls reports/tables/)",
       "Bash(ls probe_results.csv)",
       "Bash(PYTHONIOENCODING=utf-8 python *)",
-      "Bash(.venv/Scripts/python -m scripts.ablate --config-name=ablation_smoke)"
+      "Bash(.venv/Scripts/python -m scripts.ablate --config-name=ablation_smoke)",
+      "Bash(powershell.exe -Command \"Get-ChildItem -Path 'C:\\\\Program Files','C:\\\\Program Files \\(x86\\)','C:\\\\Users' -Filter 'AnyDesk.exe' -Recurse -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName\")",
+      "Bash(powershell.exe -Command \"Start-Process 'C:\\\\Users\\\\Administrator\\\\Downloads\\\\AnyDesk.exe'\")",
+      "Bash(.venv/Scripts/python -m pytest tests/test_smoke.py::test_required_directories_exist -q)"
     ]
   }
 }
