@@ -14,7 +14,7 @@ hydra:
 
 run:
   name: smoke_mlp
-  output_root: runs
+  output_root: runs/checkpoints
   seed: 42
   deterministic: false
   device: cpu

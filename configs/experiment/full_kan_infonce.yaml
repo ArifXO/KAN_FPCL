@@ -15,7 +15,7 @@ hydra:
 
 run:
   name: full_kan_infonce
-  output_root: runs
+  output_root: runs/checkpoints
   seed: 42
   deterministic: false
   device: cuda

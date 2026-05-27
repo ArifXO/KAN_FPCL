@@ -97,11 +97,14 @@ def main(cfg: DictConfig) -> None:
         step_metrics.append(step_dict)
 
         if step % cfg.train.log_every == 0:
+            alpha_str = ""
+            if hasattr(head, "alpha") and head.alpha is not None:
+                alpha_str = f" alpha={float(head.alpha.detach()):.4f}"
             print(
                 f"[step {step}] loss={loss.item():.4f} "
                 f"pos_sim={out['pos_sim_mean'].item():.4f} "
                 f"neg_sim={out['neg_sim_mean'].item():.4f} "
-                f"lr={scheduler.get_last_lr()[0]:.2e}"
+                f"lr={scheduler.get_last_lr()[0]:.2e}{alpha_str}"
             )
 
         if step % val_every == 0:

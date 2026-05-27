@@ -44,6 +44,7 @@ multirun/
 
 # All run artifacts (ephemeral — checkpoints, metrics, plots, result CSVs)
 runs/
+!runs/checkpoints/.gitkeep
 !runs/results/.gitkeep
 !runs/tables/.gitkeep
 !runs/figures/.gitkeep

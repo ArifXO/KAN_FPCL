@@ -15,7 +15,7 @@ hydra:
 
 run:
   name: full_reskan_fn_kan
-  output_root: runs
+  output_root: runs/checkpoints
   seed: 42
   deterministic: false
   device: cuda

@@ -15,7 +15,7 @@
 # Cell 11 edge_contrastive_kan -> full_edge_l005_kan_scorer -> FastKANProjector + EdgeAwareKAN(λ=0.05) ✓
 # Each cell triggers: train -> probe -> analyze_geometry, with one merged
 # row appended to ablation_master.csv. Per-step intermediate CSVs are kept
-# under reports/tables/_ablate_*.csv so a re-run is recoverable (R8).
+# under runs/results/_ablate_*.csv so a re-run is recoverable (R8).
 #
 # To add a cell: append an entry to `cells` with:
 #   - cell_id            : unique snake_case label used in CSV + checkpoint run name
