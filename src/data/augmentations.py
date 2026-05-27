@@ -9,10 +9,18 @@ def build_contrastive_transform(
     size: int = 28,
     mean: list[float] | None = None,
     std: list[float] | None = None,
+    crop_scale: tuple[float, float] = (0.6, 1.0),
+    rotation: int = 15,
+    brightness: float = 0.3,
+    contrast: float = 0.3,
+    saturation: float = 0.0,
+    hue: float = 0.0,
+    flip_prob: float = 0.5,
 ) -> T.Compose:
     """Strong augmentation transform for contrastive pairs.
 
     No vertical flip — vertical orientation carries diagnostic meaning in CXR.
+    Defaults match configs/data/chestmnist.yaml augmentation block (R6).
     """
     if mean is None:
         mean = [0.5]
@@ -21,10 +29,10 @@ def build_contrastive_transform(
 
     return T.Compose(
         [
-            T.RandomResizedCrop(size, scale=(0.6, 1.0)),
-            T.RandomHorizontalFlip(p=0.5),
-            T.RandomRotation(degrees=15),
-            T.ColorJitter(brightness=0.3, contrast=0.3),
+            T.RandomResizedCrop(size, scale=crop_scale),
+            T.RandomHorizontalFlip(p=flip_prob),
+            T.RandomRotation(degrees=rotation),
+            T.ColorJitter(brightness=brightness, contrast=contrast, saturation=saturation, hue=hue),
             T.ToTensor(),
             T.Normalize(mean=mean, std=std),
         ]

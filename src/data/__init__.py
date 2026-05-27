@@ -60,8 +60,20 @@ def get_dataloader(cfg: DictConfig) -> dict[str, DataLoader]:
     std = list(cfg.normalize.std)
     size = cfg.size
 
+    aug = cfg.get("augmentation", {})
     train_transform = TwoViewTransform(
-        build_contrastive_transform(size=size, mean=mean, std=std)
+        build_contrastive_transform(
+            size=size,
+            mean=mean,
+            std=std,
+            crop_scale=(aug.get("crop_scale_min", 0.6), aug.get("crop_scale_max", 1.0)),
+            rotation=aug.get("rotation_degrees", 15),
+            brightness=aug.get("brightness", 0.3),
+            contrast=aug.get("contrast", 0.3),
+            saturation=aug.get("saturation", 0.0),
+            hue=aug.get("hue", 0.0),
+            flip_prob=aug.get("horizontal_flip_prob", 0.5),
+        )
     )
     eval_transform = build_eval_transform(size=size, mean=mean, std=std)
 
