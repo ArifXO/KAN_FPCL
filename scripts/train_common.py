@@ -65,7 +65,6 @@ def base_step_metrics(step: int, lr: float, out: dict, epoch: int = 0) -> dict:
         "edge_align_loss": float(out.get("edge_align_loss", float("nan"))),
         "p_fn_reg_loss": float(out.get("p_fn_reg_loss", float("nan"))),
         "total_loss": float(out.get("total_loss", float("nan"))),
-        "contrastive_loss": float(out.get("contrastive_loss", float("nan"))),
         "alpha": float(out.get("alpha", float("nan"))),
     }
 

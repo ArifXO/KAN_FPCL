@@ -114,11 +114,10 @@ def main(cfg: DictConfig) -> None:
             optim.step()
             scheduler.step()
 
-            losses.append(float(total_loss.item()))
+            losses.append(float(contrastive_loss.item()))
             step_dict = base_step_metrics(step, scheduler.get_last_lr()[0], out, epoch=epoch)
             step_dict["p_fn_reg_loss"] = float(p_fn_reg.detach())
             step_dict["total_loss"] = float(total_loss.detach())
-            step_dict["contrastive_loss"] = float(contrastive_loss.detach())
             step_metrics.append(step_dict)
 
             if step % cfg.train.log_every == 0:
@@ -161,6 +160,7 @@ def main(cfg: DictConfig) -> None:
     metrics = {
         "train_loss_final": losses[-1] if losses else float("nan"),
         "train_loss_curve": losses,
+        "train_loss_type": "contrastive",
         "val_loss_curve": val_loss_curve,
         "best_val_loss": best_val_loss,
         "best_val_step": best_val_step,
