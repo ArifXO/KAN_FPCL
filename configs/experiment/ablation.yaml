@@ -98,11 +98,11 @@ ablate:
       dataset: chestmnist
       overrides: []
 
-    # Cell 6 — H3+H1: ResidualKAN projector + FN-weighted + KAN scorer.
-    - cell_id: reskan_fn_kan
+    # Cell 6 — H3+H1: FastKAN projector + FN-weighted + KAN scorer.
+    - cell_id: kan_fn_kan
       train_script: scripts.train_fn
       train_config: full_reskan_fn_kan
-      head: residual_fastkan
+      head: fastkan
       loss: fn_weighted
       scorer: kan
       lambda_edge: 0.0

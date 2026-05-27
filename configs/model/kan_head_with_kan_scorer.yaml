@@ -1,0 +1,31 @@
+# configs/model/kan_head_with_kan_scorer.yaml
+# H1+H3 combined: FastKAN projector + KAN pair scorer.
+# No edge features — this is a pure KAN-everywhere test.
+#
+# R1 parity:
+#   Head: FastKANProjector(512->64->128) ≈ 328K params
+#   Scorer: KANPairScorer(128, hidden=5, centers=6) ≈ 8.9K params
+
+encoder:
+  _target_: src.models.ResNet18Encoder
+  pretrained: false
+
+head:
+  _target_: src.models.kan.FastKANProjector
+  input_dim: 512
+  hidden_dim: 64
+  output_dim: 128
+  num_centers: 8
+  grid_min: -2.0
+  grid_max: 2.0
+  use_base_linear: true
+  base_activation: silu
+  rbf_init_scale: 0.1
+  normalize: true
+
+scorer:
+  _target_: src.models.KANPairScorer
+  input_dim: 128
+  hidden_dim: 5
+  num_centers: 6
+  use_base_linear: true

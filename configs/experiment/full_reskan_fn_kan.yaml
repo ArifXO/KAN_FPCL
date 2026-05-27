@@ -1,11 +1,12 @@
 # configs/experiment/full_reskan_fn_kan.yaml
-# H3 + H1 combined: ResidualKAN projector + FN-weighted + KAN pair scorer.
-# Tests whether KAN throughout (both head and scorer) compounds gains.
+# H1+H3 combined: FastKAN projector + FN-weighted + KAN pair scorer.
+# Tests whether KAN in both head and scorer compounds gains.
+# NO edge features — uses KANPairScorer, not EdgeAwarePairScorer.
 
 defaults:
   - _self_
   - /data: chestmnist
-  - /model: edge_aware_kan
+  - /model: kan_head_with_kan_scorer
   - /loss: fn_weighted_mlp
 
 hydra:
