@@ -91,7 +91,10 @@ def main(cfg: DictConfig) -> None:
         scheduler.step()
 
         losses.append(float(loss.item()))
-        step_metrics.append(base_step_metrics(step, scheduler.get_last_lr()[0], out))
+        step_dict = base_step_metrics(step, scheduler.get_last_lr()[0], out)
+        if hasattr(head, "alpha") and head.alpha is not None:
+            step_dict["alpha"] = float(head.alpha.detach())
+        step_metrics.append(step_dict)
 
         if step % cfg.train.log_every == 0:
             print(

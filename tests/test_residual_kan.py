@@ -4,6 +4,7 @@ import pytest
 import torch
 import torch.nn.functional as F
 
+from src.models import MLPHead, ProjectorWithWarp
 from src.models.kan import ResidualFastKANWarp
 
 
@@ -100,3 +101,99 @@ def test_residual_warp_rejects_wrong_input_shape():
     warp = ResidualFastKANWarp(input_dim=4, hidden_dim=3)
     with pytest.raises(ValueError, match="expected input shape"):
         warp(torch.randn(2, 5))
+
+
+# ---------------------------------------------------------------------------
+# return_edges support
+# ---------------------------------------------------------------------------
+
+
+def test_residual_warp_return_edges_active_path():
+    warp = ResidualFastKANWarp(
+        input_dim=8, hidden_dim=4, num_centers=6, alpha_init=0.1, learnable_alpha=True
+    )
+    z = torch.randn(5, 8)
+
+    out, phi = warp(z, return_edges=True)
+
+    assert out.shape == (5, 8)
+    assert torch.allclose(out.norm(dim=-1), torch.ones(5), atol=1e-5)
+    # KAN last-layer edges: [batch, output_dim=input_dim, input_dim=hidden_dim].
+    assert phi.shape == (5, 8, 4)
+    assert torch.isfinite(phi).all()
+
+
+def test_residual_warp_return_edges_zeros_when_bypassed():
+    warp = ResidualFastKANWarp(
+        input_dim=8, hidden_dim=4, alpha_init=0.0, learnable_alpha=False
+    )
+    z = torch.randn(3, 8)
+
+    out, phi = warp(z, return_edges=True)
+
+    assert torch.equal(out, F.normalize(z, dim=-1, eps=1e-12))
+    assert phi.shape == (3, 8, 4)
+    assert torch.count_nonzero(phi) == 0
+
+
+# ---------------------------------------------------------------------------
+# ProjectorWithWarp composite head (H1 fix: 128-D output, not 512-D)
+# ---------------------------------------------------------------------------
+
+
+def _mlp_projector(out_dim: int = 128) -> MLPHead:
+    return MLPHead(
+        in_dim=512,
+        hidden_dim=512,
+        output_dim=out_dim,
+        use_batch_norm=True,
+        l2_normalize=False,
+    )
+
+
+def test_composite_output_dim_equals_warp_width_not_512():
+    head = ProjectorWithWarp(
+        _mlp_projector(128),
+        ResidualFastKANWarp(input_dim=128, hidden_dim=16, num_centers=8),
+    )
+    h = torch.randn(4, 512)
+
+    z = head(h)
+
+    assert z.shape == (4, 128)
+    assert torch.allclose(z.norm(dim=-1), torch.ones(4), atol=1e-5)
+
+
+def test_composite_return_edges_come_from_warp():
+    head = ProjectorWithWarp(
+        _mlp_projector(128),
+        ResidualFastKANWarp(
+            input_dim=128, hidden_dim=16, num_centers=8, alpha_init=0.1
+        ),
+    )
+    h = torch.randn(4, 512)
+
+    z, phi = head(h, return_edges=True)
+
+    assert z.shape == (4, 128)
+    assert phi.shape == (4, 128, 16)
+
+
+def test_composite_warp_none_equals_projector_alone():
+    projector = MLPHead(
+        in_dim=512, hidden_dim=32, output_dim=128, use_batch_norm=False
+    )
+    head = ProjectorWithWarp(projector, warp=None)
+    h = torch.randn(3, 512)
+
+    assert torch.equal(head(h), projector(h))
+
+
+def test_composite_alpha_property_exposes_warp_alpha():
+    warp = ResidualFastKANWarp(input_dim=128, hidden_dim=16, alpha_init=0.05)
+    with_warp = ProjectorWithWarp(_mlp_projector(128), warp)
+    without_warp = ProjectorWithWarp(_mlp_projector(128), warp=None)
+
+    assert with_warp.alpha is not None
+    assert torch.equal(with_warp.alpha, warp.alpha)
+    assert without_warp.alpha is None

@@ -92,15 +92,32 @@ class ResidualFastKANWarp(nn.Module):
             return self.alpha_raw.clamp(0.0, self.clamp_max)
         return self.alpha_raw
 
-    def forward(self, z: torch.Tensor) -> torch.Tensor:
-        """Warp a ``[batch, input_dim]`` embedding and L2-normalize the result."""
+    def forward(
+        self, z: torch.Tensor, return_edges: bool = False
+    ) -> torch.Tensor | tuple[torch.Tensor, torch.Tensor]:
+        """Warp a ``[batch, input_dim]`` embedding and L2-normalize the result.
+
+        With ``return_edges=True`` also returns the KAN last-layer edge tensor
+        of shape ``[batch, input_dim, hidden_dim]``. When the KAN branch is
+        bypassed (fixed alpha == 0) the edges are returned as zeros of that
+        shape, since the warp contributes no spline activation.
+        """
         if z.ndim != 2 or z.shape[-1] != self.input_dim:
             raise ValueError(
                 "ResidualFastKANWarp expected input shape "
                 f"[batch, {self.input_dim}], got {tuple(z.shape)}."
             )
         if not self.learnable_alpha and float(self.alpha.detach()) == 0.0:
-            return F.normalize(z, dim=-1, eps=1e-12)
+            normalized = F.normalize(z, dim=-1, eps=1e-12)
+            if return_edges:
+                phi = z.new_zeros(z.shape[0], self.input_dim, self.hidden_dim)
+                return normalized, phi
+            return normalized
+
+        if return_edges:
+            delta, phi = self.kan(self.norm(z), return_edges=True)
+            warped = z + self.alpha * delta
+            return F.normalize(warped, dim=-1, eps=1e-12), phi
 
         delta = self.kan(self.norm(z))
         warped = z + self.alpha * delta
