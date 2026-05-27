@@ -103,7 +103,19 @@ def main(cfg: DictConfig) -> None:
     encoder = instantiate(ckpt_cfg.model.encoder).to(device)
     head = instantiate(ckpt_cfg.model.head).to(device)
 
-    state = torch.load(ckpt_dir / "model.pt", map_location=device)
+    best_path = ckpt_dir / "model_best.pt"
+    fallback_path = ckpt_dir / "model.pt"
+    if best_path.exists():
+        state = torch.load(best_path, map_location=device)
+        print(f"[probe] Loaded best-val checkpoint: {best_path}")
+    elif fallback_path.exists():
+        state = torch.load(fallback_path, map_location=device)
+        print(f"[probe] Warning: model_best.pt not found, using model.pt (last step)")
+    else:
+        raise ValueError(
+            f"No model checkpoint found in {ckpt_dir}. "
+            "Expected model_best.pt or model.pt."
+        )
     encoder.load_state_dict({k[len("encoder."):]: v for k, v in state.items() if k.startswith("encoder.")})
     head.load_state_dict({k[len("head."):]: v for k, v in state.items() if k.startswith("head.")})
 

@@ -62,6 +62,9 @@ runs/
 .DS_Store
 Thumbs.db
 
+# Archived stale results (dev-iteration artifacts)
+_archive_old_results/
+
 # Secrets
 .env
 *.key

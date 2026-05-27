@@ -44,18 +44,21 @@ _CSV_COLUMNS = [
 
 def _load_model(ckpt_dir: Path, device: torch.device) -> tuple[nn.Module, nn.Module]:
     cfg_path = ckpt_dir / "config.yaml"
-    model_path = ckpt_dir / "model.pt"
     if not ckpt_dir.exists():
         raise ValueError(f"checkpoint_dir does not exist: {ckpt_dir}.")
     if not cfg_path.exists():
         raise ValueError(f"No config.yaml found in checkpoint_dir: {ckpt_dir}.")
-    if not model_path.exists():
-        raise ValueError(f"No model.pt found in checkpoint_dir: {ckpt_dir}.")
+
+    best_path = ckpt_dir / "model_best.pt"
+    model_path = ckpt_dir / "model.pt"
+    load_path = best_path if best_path.exists() else model_path
+    if not load_path.exists():
+        raise ValueError(f"No model checkpoint in {ckpt_dir}.")
 
     ckpt_cfg = OmegaConf.load(cfg_path)
     encoder = instantiate(ckpt_cfg.model.encoder).to(device)
     head = instantiate(ckpt_cfg.model.head).to(device)
-    state = torch.load(model_path, map_location=device)
+    state = torch.load(load_path, map_location=device)
     encoder.load_state_dict(
         {k[len("encoder."):]: v for k, v in state.items() if k.startswith("encoder.")}
     )

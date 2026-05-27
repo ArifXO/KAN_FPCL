@@ -78,7 +78,9 @@
       "Bash(python -m pytest tests/test_smoke.py -q)",
       "Bash(python -m pytest tests/test_fn_weighted_loss.py -v)",
       "Bash(python -m pytest tests/ -q)",
-      "Bash(python *)"
+      "Bash(python *)",
+      "Bash(ls reports/tables/)",
+      "Bash(ls probe_results.csv)"
     ]
   }
 }

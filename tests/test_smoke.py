@@ -66,8 +66,9 @@ def test_claude_md_contains_all_rules():
         assert f"R{i}" in text, f"CLAUDE.md missing rule R{i}"
 
 
-def test_todo_all_unchecked():
-    root = pathlib.Path(__file__).parent.parent
-    text = (root / "TODO.md").read_text(encoding="utf-8")
-    assert "- [x]" not in text.lower(), "TODO.md should have no checked items at Stage 0"
-    assert "- [ ]" in text, "TODO.md should contain unchecked items"
+def test_todo_exists():
+    """TODO.md exists and is non-empty."""
+    todo = pathlib.Path(__file__).parent.parent / "TODO.md"
+    assert todo.exists(), "TODO.md missing"
+    content = todo.read_text(encoding="utf-8")
+    assert len(content) > 100, "TODO.md looks empty or truncated"
