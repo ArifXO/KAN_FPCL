@@ -12,6 +12,7 @@
 # Cell 8 edge_contrastive   -> edge_aware_mlp.yaml          -> FastKANProjector + EdgeAwareMLP    ✓
 # Cell 9 edge_align         -> edge_aware_mlp.yaml          -> FastKANProjector + EdgeAwareMLP    ✓
 # Cell 10 zonly_fn          -> edge_aware_mlp_zonly.yaml    -> FastKANProjector + EdgeAwareMLP(z-only) ✓
+# Cell 11 edge_contrastive_kan -> full_edge_l005_kan_scorer -> FastKANProjector + EdgeAwareKAN(λ=0.05) ✓
 # Each cell triggers: train -> probe -> analyze_geometry, with one merged
 # row appended to ablation_master.csv. Per-step intermediate CSVs are kept
 # under reports/tables/_ablate_*.csv so a re-run is recoverable (R8).
@@ -124,10 +125,12 @@ ablate:
 
     # ── H4: Edge signal hypothesis ────────────────────────────────────────────
     # H4 decomposition (4 rows):
-    #   Cell 10: zonly_fn           — scorer sees z-features ONLY (true baseline)
-    #   Cell 7:  edge_scorer_no_aux — scorer sees z + edge features, λ=0 (feature effect)
-    #   Cell 8:  edge_contrastive   — scorer sees z + edge features, λ_edge=0.05
-    #   Cell 9:  edge_align         — scorer sees z + edge features, λ_edge_align=0.05
+    #   Cell 10: zonly_fn                — scorer sees z-features ONLY (true baseline)
+    #   Cell 7:  edge_scorer_no_aux      — scorer sees z + edge features, λ=0 (feature effect)
+    #   Cell 8:  edge_contrastive        — scorer sees z + edge features, λ_edge=0.05 (MLP scorer)
+    #   Cell 9:  edge_align              — scorer sees z + edge features, λ_edge_align=0.05
+    # H3 cross-check (1 row):
+    #   Cell 11: edge_contrastive_kan    — same as Cell 8 but KAN scorer (isolates scorer arch)
 
     # Cell 7 — H4 control: edge wiring ON, both lambdas=0.
     # Any delta vs zonly_fn comes from richer pair features (edge in scorer), not aux losses.
@@ -186,4 +189,21 @@ ablate:
       dataset: chestmnist
       overrides:
         - loss.lambda_edge=0.0
+        - loss.lambda_edge_align=0.0
+
+    # ── H3 cross-check: KAN scorer vs MLP scorer under edge-contrastive aux ───
+    # Cell 11 — H3 cross-check: edge + KAN scorer + lambda_edge=0.05.
+    # Compare vs Cell 8 (edge_contrastive, MLP scorer, λ_edge=0.05) to isolate
+    # whether H4 gains come from edge features or from KAN scorer architecture.
+    - cell_id: edge_contrastive_kan
+      train_script: scripts.train_edge
+      train_config: full_edge_l005_kan_scorer
+      head: fastkan
+      loss: edge_aware_fn
+      scorer: edge_kan
+      lambda_edge: 0.05
+      lambda_edge_align: 0.0
+      dataset: chestmnist
+      overrides:
+        - loss.lambda_edge=0.05
         - loss.lambda_edge_align=0.0
