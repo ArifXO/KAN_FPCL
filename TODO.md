@@ -23,9 +23,9 @@ Changes made or reconciled during Prompts 0-9:
   dataset routing is explicit and does not silently route CheXpert through
   ChestMNIST.
 - Full training configs: 9 `full_*.yaml` configs added, each set to 10K steps.
-- p_fn collapse guard: Full FN configs include `lambda_pfn_reg=0.01`; edge-aware
-  loss config uses `max_fn_weight=0.5`. Caveat: `configs/loss/fn_weighted_mlp.yaml`
-  still shows `max_fn_weight: 1.0`, so verify/fix this before full FN ablations.
+- p_fn collapse guard: Full FN configs include `lambda_pfn_reg=0.01`; both
+  `configs/loss/fn_weighted_mlp.yaml` and `configs/loss/edge_aware.yaml` use
+  `max_fn_weight=0.5`, keeping H2/H3/H4 cells on a fair footing.
 - make_paper_tables.py: Guard clauses and per-class H2 rare-disease rows added.
 - All smoke tests passing: `pytest tests/test_smoke.py -q` -> 5 passed on
   2026-05-26.
@@ -177,8 +177,6 @@ wired.
 
 **Open items:**
 
-- Before full ablation, align `configs/loss/fn_weighted_mlp.yaml` with the
-  intended `max_fn_weight=0.5` guard or document why it remains `1.0`.
 - H2 is not scientifically decided until Stage 10 3-seed rows exist.
 
 ---
@@ -307,10 +305,8 @@ FAILED rows, and all four paper tables are generated.
 
 ## Current Next Actions
 
-1. Fix or explicitly justify `configs/loss/fn_weighted_mlp.yaml:max_fn_weight`
-   before full FN ablations.
-2. Run the 27-row ChestMNIST ablation matrix.
-3. Run `scripts/make_paper_tables.py` after ablation rows exist.
+1. Run the 27-row ChestMNIST ablation matrix.
+2. Run `scripts/make_paper_tables.py` after ablation rows exist.
 4. Review generated tables and record H1-H4 outcomes.
 5. Keep CheXpert deferred until Stage 9 is deliberately activated.
 
