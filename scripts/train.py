@@ -128,7 +128,7 @@ def main(cfg: DictConfig) -> None:
     runtime = time.time() - t0
 
     run_id = make_run_id()
-    run_dir = Path(cfg.run.output_root) / f"run_{cfg.run.name}_{run_id}"
+    run_dir = Path(cfg.run.output_root) / f"{cfg.run.name}_{run_id}"
 
     if best_state is None:
         best_state = snapshot_cpu_state(full_model)
@@ -155,8 +155,16 @@ def main(cfg: DictConfig) -> None:
         metrics=metrics,
     )
     (run_dir / "step_metrics.json").write_text(json.dumps(step_metrics, indent=2))
+    if step_metrics:
+        import csv as csv_mod
+        csv_path = run_dir / "step_metrics.csv"
+        with open(csv_path, "w", newline="") as f:
+            writer = csv_mod.DictWriter(f, fieldnames=list(step_metrics[0].keys()))
+            writer.writeheader()
+            writer.writerows(step_metrics)
     torch.save(best_state, run_dir / "model_best.pt")
     print(f"Run artifacts saved to: {run_dir}")
+    print(f"  step_metrics: {len(step_metrics)} steps ({epoch} epochs)")
 
 
 if __name__ == "__main__":

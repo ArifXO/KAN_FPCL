@@ -44,11 +44,6 @@ multirun/
 
 # All run artifacts (ephemeral — checkpoints, metrics, plots, result CSVs)
 runs/
-!runs/smoke/.gitkeep
-!runs/ablation/h1_architecture/.gitkeep
-!runs/ablation/h2_fn_weighted/.gitkeep
-!runs/ablation/h3_kan_scorer/.gitkeep
-!runs/ablation/h4_edge_signal/.gitkeep
 !runs/results/.gitkeep
 !runs/tables/.gitkeep
 !runs/figures/.gitkeep
