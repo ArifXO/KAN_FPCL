@@ -221,6 +221,56 @@ def test_gradient_flows_to_z_scorer_and_kan_via_edges():
     assert kan_w.grad.abs().sum() > 0
 
 
+def test_gradient_flows_through_edge_to_kan_weights():
+    """Train-script-level guard for H4 (mirrors scripts/train_edge.py).
+
+    With both aux lambdas at 0 and ``z`` detached into *both* the scorer and
+    the loss, the ONLY live path from the loss back to the KAN projector
+    weights is ``edge_features -> scorer -> p_fn -> fn_loss``. (``p_fn`` enters
+    ``FNWeightedInfoNCELoss`` via ``log(1 - p_fn)`` inside the logsumexp, so it
+    is differentiable even when ``z`` is constant.) This isolates the pathway
+    that ``train_edge.py`` would sever if it detached ``edge_features`` before
+    the scorer — the H4 bug. We assert the gradient is present when the edge
+    arg is live and absent when it is detached, so re-introducing the detach
+    makes this test fail.
+    """
+    from src.models.kan import FastKANProjector
+
+    b = 4
+    torch.manual_seed(0)
+    x = torch.randn(2 * b, 32)
+
+    def kan_grad_norm(detach_edge: bool) -> float:
+        projector = FastKANProjector(
+            input_dim=32, hidden_dim=16, output_dim=8, num_centers=4, normalize=True
+        )
+        scorer = EdgeAwarePairScorer(input_dim=8, use_edge_features=True, scorer_type="mlp")
+        loss_fn = EdgeAwareFNWeightedInfoNCELoss(lambda_edge=0.0, lambda_edge_align=0.0)
+
+        z, phi = projector(x, return_edges=True)
+        edge_feats = edge_fingerprint(phi)
+        edge_arg = edge_feats[:b].detach() if detach_edge else edge_feats[:b]
+        p_fn = scorer(z[:b].detach(), edge_arg)
+        # z detached + edges=None in the loss => the scorer's edge path is the
+        # sole route to the projector weights.
+        out = loss_fn(z.detach(), p_fn, None)
+        out["loss"].backward()
+        g = projector.output_layer.rbf_weight.grad
+        return float(g.abs().sum()) if g is not None else 0.0
+
+    alive = kan_grad_norm(detach_edge=False)
+    severed = kan_grad_norm(detach_edge=True)
+    assert alive > 0, (
+        "No KAN projector gradient through the scorer -> edge path. H4's "
+        "scorer -> edge -> KAN gradient pathway is broken (edge_features likely "
+        "detached before the scorer in train_edge.py)."
+    )
+    assert severed == 0, (
+        f"KAN received gradient (={severed}) even with edge_features detached; "
+        "the test no longer isolates the scorer -> edge -> KAN path."
+    )
+
+
 # ---------------------------------------------------------------------------
 # (i) PARAM PARITY (R1): KAN scorer within ±15 % of MLP scorer
 # ---------------------------------------------------------------------------

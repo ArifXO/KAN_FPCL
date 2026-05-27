@@ -29,6 +29,7 @@ train:
   grad_clip: 1.0
   val_every: 2          # smoke: validate often on the tiny step budget
   val_max_batches: 2    # cap val cost on the large ChestMNIST val split
+  detach_scorer_edge: false   # H4: keep scorer->edge->KAN gradient path live
 
 data:
   batch_size: 4

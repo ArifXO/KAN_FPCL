@@ -28,6 +28,7 @@ train:
   val_every: 500
   val_max_batches: null
   lambda_pfn_reg: 0.01
+  detach_scorer_edge: false   # H4: keep scorer->edge->KAN gradient path live
 
 data:
   batch_size: 256

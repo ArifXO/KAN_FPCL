@@ -89,6 +89,7 @@ def main(cfg: DictConfig) -> None:
     val_max_batches = cfg.train.get("val_max_batches", None)
     val_seed = int(cfg.run.seed) + 10000
     lambda_pfn_reg = cfg.train.get("lambda_pfn_reg", 0.0)
+    detach_scorer_edge = cfg.train.get("detach_scorer_edge", False)
 
     def forward_batch(x: torch.Tensor):
         if edge_aware:
@@ -135,10 +136,14 @@ def main(cfg: DictConfig) -> None:
             scorer_edge_arg = (
                 edge_feats[:batch] if (edge_aware and scorer.use_edge_features) else None
             )
-            p_fn = scorer(
-                z[:batch].detach(),
-                scorer_edge_arg.detach() if scorer_edge_arg is not None else None,
-            )
+            # z.detach(): scorer must not reshape main embeddings (SimCLR convention).
+            # edge_features NOT detached: H4 requires gradient flow from the scorer's
+            # p_fn decisions back through edge_fingerprint into the KAN projector
+            # weights. Set train.detach_scorer_edge=true for the ablation that
+            # isolates aux-loss-only training of edges from scorer-driven training.
+            if scorer_edge_arg is not None and detach_scorer_edge:
+                scorer_edge_arg = scorer_edge_arg.detach()
+            p_fn = scorer(z[:batch].detach(), scorer_edge_arg)
 
             out = loss_fn(z, p_fn, edge_feats if edge_aware else None)
             contrastive_loss = out["loss"]

@@ -63,7 +63,11 @@ For multi-step tasks, state a brief plan:
 
 Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
 
+## 5. Document Justified Deviations
 
+When following an explicit instruction literally would be wrong, don't silently comply and don't silently deviate. Implement the corrected version, then state plainly what changed and why. If the deviation is a reusable lesson, record it in this file so the next contributor inherits it.
+
+**Worked example — gradient-flow isolation tests must sever competing paths.** A test asserting "parameter X received gradient" only proves the *intended* pathway works if every *other* path to X is detached. When verifying the H4 scorer→edge→KAN pathway, a proposed test passed un-detached `z` into the loss, so `z → projector` supplied the gradient on its own and the test passed whether or not `edge_features` was detached (vacuous — caught neither the bug nor its fix). The valid test detaches `z` into *both* the scorer and the loss (and passes `edge_features=None` when both lambdas are 0) so the scorer→edge route is the *sole* path to the KAN weights, then asserts the gradient is present when the edge arg is live and absent when it is detached.
 
 **These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
 
