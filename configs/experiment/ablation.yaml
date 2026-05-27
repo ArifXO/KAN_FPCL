@@ -49,6 +49,7 @@ ablate:
 
     # Cell 1 — H1 baseline: MLP projector + plain InfoNCE, no scorer.
     - cell_id: mlp_infonce
+      hypothesis: h1
       train_script: scripts.train
       train_config: full_mlp_infonce
       head: mlp
@@ -61,6 +62,7 @@ ablate:
 
     # Cell 2 — H1: FastKAN projector + plain InfoNCE, no scorer.
     - cell_id: kan_infonce
+      hypothesis: h1
       train_script: scripts.train
       train_config: full_kan_infonce
       head: fastkan
@@ -73,6 +75,7 @@ ablate:
 
     # Cell 3 — H1: Residual FastKAN projector + plain InfoNCE, no scorer.
     - cell_id: reskan_infonce
+      hypothesis: h1
       train_script: scripts.train
       train_config: full_reskan_infonce
       head: residual_fastkan
@@ -87,6 +90,7 @@ ablate:
 
     # Cell 4 — H2: MLP projector + FN-weighted InfoNCE + MLP pair scorer.
     - cell_id: mlp_fn_mlp
+      hypothesis: h2
       train_script: scripts.train_fn
       train_config: full_mlp_fn_mlp
       head: mlp
@@ -101,6 +105,7 @@ ablate:
 
     # Cell 5 — H3: MLP projector + FN-weighted InfoNCE + KAN pair scorer.
     - cell_id: mlp_fn_kan
+      hypothesis: h3
       train_script: scripts.train_fn
       train_config: full_mlp_fn_kan
       head: mlp
@@ -113,6 +118,7 @@ ablate:
 
     # Cell 6 — H3+H1: FastKAN projector + FN-weighted + KAN scorer.
     - cell_id: kan_fn_kan
+      hypothesis: h3
       train_script: scripts.train_fn
       train_config: full_reskan_fn_kan
       head: fastkan
@@ -135,6 +141,7 @@ ablate:
     # Cell 7 — H4 control: edge wiring ON, both lambdas=0.
     # Any delta vs zonly_fn comes from richer pair features (edge in scorer), not aux losses.
     - cell_id: edge_scorer_no_aux
+      hypothesis: h4
       train_script: scripts.train_edge
       train_config: full_edge_scorer_no_aux
       head: fastkan
@@ -149,6 +156,7 @@ ablate:
 
     # Cell 8 — H4 treatment A: edge contrastive aux ON (lambda_edge=0.05).
     - cell_id: edge_contrastive
+      hypothesis: h4
       train_script: scripts.train_edge
       train_config: full_edge_l005
       head: fastkan
@@ -163,6 +171,7 @@ ablate:
 
     # Cell 9 — H4 treatment B: edge-align aux ON (lambda_edge_align=0.05).
     - cell_id: edge_align
+      hypothesis: h4
       train_script: scripts.train_edge
       train_config: full_edge_align_l005
       head: fastkan
@@ -179,6 +188,7 @@ ablate:
     # This is the REAL baseline for H4. Cells 7-9 all have edge features;
     # comparing them against this cell isolates the edge-signal contribution.
     - cell_id: zonly_fn
+      hypothesis: h4
       train_script: scripts.train_edge
       train_config: full_zonly_fn
       head: fastkan
@@ -196,6 +206,7 @@ ablate:
     # Compare vs Cell 8 (edge_contrastive, MLP scorer, λ_edge=0.05) to isolate
     # whether H4 gains come from edge features or from KAN scorer architecture.
     - cell_id: edge_contrastive_kan
+      hypothesis: h3_cross
       train_script: scripts.train_edge
       train_config: full_edge_l005_kan_scorer
       head: fastkan

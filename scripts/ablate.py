@@ -80,13 +80,23 @@ def _last_csv_row(csv_path: Path) -> dict[str, str]:
     return rows[-1]
 
 
-def _train(cell: DictConfig, seed: int, project_root: Path) -> Path:
+_HYPOTHESIS_DIR = {
+    "h1": "h1_architecture",
+    "h2": "h2_fn_weighted",
+    "h3": "h3_kan_scorer",
+    "h3_cross": "h3_kan_scorer",
+    "h4": "h4_edge_signal",
+}
+
+
+def _train(cell: DictConfig, seed: int, output_root: str, project_root: Path) -> Path:
     overrides = list(cell.get("overrides", []))
     cmd = [
         sys.executable, "-m", str(cell.train_script),
         f"--config-name={cell.train_config}",
         f"run.seed={seed}",
         f"run.name={cell.cell_id}_s{seed}",
+        f"run.output_root={output_root}",
         *overrides,
     ]
     return _find_run_dir(_run(cmd, project_root))
@@ -144,9 +154,15 @@ def _run_cell(
         "seed": seed,
         "status": "FAILED",
     }
+    if cell.cell_id.startswith("smoke_"):
+        output_root = "runs/smoke"
+    else:
+        hyp = cell.get("hypothesis", "h1")
+        output_root = f"runs/ablation/{_HYPOTHESIS_DIR[hyp]}"
+
     t0 = time.time()
     try:
-        ckpt_dir = _train(cell, seed, project_root)
+        ckpt_dir = _train(cell, seed, output_root, project_root)
         probe_row = _probe(ckpt_dir, cell, seed, probe_csv, project_root)
         geom_row = _geometry(ckpt_dir, cell, seed, geom_csv, project_root)
         row.update({
