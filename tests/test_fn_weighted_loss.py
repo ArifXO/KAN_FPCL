@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 import torch
+import torch.nn.functional as F
 
 from src.losses import FNWeightedInfoNCELoss, InfoNCELoss
 
@@ -248,3 +249,20 @@ def test_max_fn_weight_caps_downweighting():
         f"capping had no effect: capped={capped['loss'].item():.4f}, "
         f"uncapped={uncapped['loss'].item():.4f}"
     )
+
+
+def test_max_fn_weight_caps_denominator():
+    """max_fn_weight=0.5 prevents full negative removal.
+
+    All views are identical (similarity 1 everywhere), so with the cap the 14
+    negative slots per row stay in the denominator at weight 0.5 and the loss
+    cannot collapse: loss ≈ log(1 + 14·0.5) = log(8) ≈ 2.08. At
+    max_fn_weight=1.0 those same slots would be removed and the loss → 0.
+    """
+    loss_fn = FNWeightedInfoNCELoss(temperature=0.1, max_fn_weight=0.5)
+    base = F.normalize(torch.randn(1, 16), dim=-1)
+    z_cat = base.repeat(16, 1)  # B=8; every view identical
+    p_fn_max = torch.ones(8, 8)  # scorer tries to remove everything
+    out = loss_fn(z_cat, p_fn_max)
+    # With max_fn_weight=0.5, weights floor at 0.5, loss should be substantial
+    assert out["loss"].item() > 0.1, "loss too low — cap not working"

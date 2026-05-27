@@ -70,8 +70,11 @@ def main(cfg: DictConfig) -> None:
     val_every = cfg.train.get("val_every", 200)
     val_max_batches = cfg.train.get("val_max_batches", None)
     val_seed = int(cfg.run.seed) + 10000
+    lambda_pfn_reg = cfg.train.get("lambda_pfn_reg", 0.0)
 
     def val_forward(v1: torch.Tensor, v2: torch.Tensor) -> dict:
+        # Validation uses raw contrastive loss without p_fn regularization.
+        # p_fn_reg is a training stabilizer, not a metric.
         z = head(encoder(torch.cat([v1, v2], dim=0)))
         p_fn = scorer(z[: v1.shape[0]])
         return loss_fn(z, p_fn)
@@ -98,23 +101,31 @@ def main(cfg: DictConfig) -> None:
         p_fn = scorer(z[:batch].detach())  # scorer trained via loss grad below
 
         out = loss_fn(z, p_fn)
-        loss = out["loss"]
+        contrastive_loss = out["loss"]
+        p_fn_reg = lambda_pfn_reg * p_fn.mean()
+        total_loss = contrastive_loss + p_fn_reg
 
         optim.zero_grad()
-        loss.backward()
+        total_loss.backward()
         torch.nn.utils.clip_grad_norm_(params, max_norm=grad_clip)
         optim.step()
         scheduler.step()
 
-        losses.append(float(loss.item()))
-        step_metrics.append(base_step_metrics(step, scheduler.get_last_lr()[0], out))
+        losses.append(float(total_loss.item()))
+        step_dict = base_step_metrics(step, scheduler.get_last_lr()[0], out)
+        step_dict["p_fn_reg_loss"] = float(p_fn_reg.detach())
+        step_dict["total_loss"] = float(total_loss.detach())
+        step_dict["contrastive_loss"] = float(contrastive_loss.detach())
+        step_metrics.append(step_dict)
 
         if step % cfg.train.log_every == 0:
             print(
-                f"[step {step}] loss={loss.item():.4f} "
+                f"[step {step}] loss={total_loss.item():.4f} "
                 f"pos_sim={out['pos_sim_mean'].item():.4f} "
                 f"neg_sim={out['neg_sim_mean'].item():.4f} "
                 f"p_fn_mean={out['p_fn_mean'].item():.4f} "
+                f"p_fn_max={out['p_fn_max'].item():.4f} "
+                f"downweighted={out['downweighted_fraction'].item():.4f} "
                 f"lr={scheduler.get_last_lr()[0]:.2e}"
             )
 

@@ -9,7 +9,7 @@
 _target_: src.losses.FNWeightedInfoNCELoss
 temperature: 0.1
 normalize_embeddings: true
-# Cap on p_fn before computing (1 - p_fn). 1.0 = allow complete removal of a
-# negative; 0.95 = floor of 0.05 on the negative weight (recommended once the
-# scorer is trained to avoid collapsing the denominator).
-max_fn_weight: 1.0
+# Cap on p_fn. 0.5 = floor of 0.5 on negative weights, preventing the
+# scorer from completely removing negatives (Pitfall #3: p_FN collapse).
+# Setting this to 1.0 allows full removal and risks denominator collapse.
+max_fn_weight: 0.5

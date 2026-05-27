@@ -88,6 +88,7 @@ def main(cfg: DictConfig) -> None:
     val_every = cfg.train.get("val_every", 200)
     val_max_batches = cfg.train.get("val_max_batches", None)
     val_seed = int(cfg.run.seed) + 10000
+    lambda_pfn_reg = cfg.train.get("lambda_pfn_reg", 0.0)
 
     def forward_batch(x: torch.Tensor):
         if edge_aware:
@@ -96,6 +97,8 @@ def main(cfg: DictConfig) -> None:
         return head(x), None
 
     def val_forward(v1: torch.Tensor, v2: torch.Tensor) -> dict:
+        # Validation uses raw contrastive loss without p_fn regularization.
+        # p_fn_reg is a training stabilizer, not a metric.
         x = torch.cat([v1, v2], dim=0)
         feats = encoder(x)
         z, edge_feats = forward_batch(feats)
@@ -135,27 +138,34 @@ def main(cfg: DictConfig) -> None:
         )
 
         out = loss_fn(z, p_fn, edge_feats if edge_aware else None)
-        loss = out["loss"]
+        contrastive_loss = out["loss"]
+        p_fn_reg = lambda_pfn_reg * p_fn.mean()
+        total_loss = contrastive_loss + p_fn_reg
 
         optim.zero_grad()
-        loss.backward()
+        total_loss.backward()
         torch.nn.utils.clip_grad_norm_(params, max_norm=grad_clip)
         optim.step()
         scheduler.step()
 
-        losses.append(float(loss.item()))
+        losses.append(float(total_loss.item()))
         step_dict = base_step_metrics(step, scheduler.get_last_lr()[0], out)
+        step_dict["p_fn_reg_loss"] = float(p_fn_reg.detach())
+        step_dict["total_loss"] = float(total_loss.detach())
+        step_dict["contrastive_loss"] = float(contrastive_loss.detach())
         if hasattr(head, "alpha"):
             step_dict["alpha"] = float(head.alpha.detach())
         step_metrics.append(step_dict)
 
         if step % cfg.train.log_every == 0:
             print(
-                f"[step {step}] loss={loss.item():.4f} "
+                f"[step {step}] loss={total_loss.item():.4f} "
                 f"fn={float(out['fn_loss']):.4f} "
                 f"edge_c={float(out['edge_contrastive_loss']):.4f} "
                 f"edge_a={float(out['edge_align_loss']):.4f} "
                 f"p_fn_mean={float(out['p_fn_mean']):.4f} "
+                f"p_fn_max={out['p_fn_max'].item():.4f} "
+                f"downweighted={out['downweighted_fraction'].item():.4f} "
                 f"lr={scheduler.get_last_lr()[0]:.2e}"
             )
 

@@ -75,7 +75,9 @@
       "Bash(.venv/Scripts/python -m pytest tests/ -q)",
       "Bash(git stash *)",
       "Bash(.venv/Scripts/python -m pytest tests/test_smoke.py::test_todo_all_unchecked -q)",
-      "Bash(python -m pytest tests/test_smoke.py -q)"
+      "Bash(python -m pytest tests/test_smoke.py -q)",
+      "Bash(python -m pytest tests/test_fn_weighted_loss.py -v)",
+      "Bash(python -m pytest tests/ -q)"
     ]
   }
 }
