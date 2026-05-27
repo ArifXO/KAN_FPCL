@@ -80,7 +80,8 @@
       "Bash(python -m pytest tests/ -q)",
       "Bash(python *)",
       "Bash(ls reports/tables/)",
-      "Bash(ls probe_results.csv)"
+      "Bash(ls probe_results.csv)",
+      "Bash(PYTHONIOENCODING=utf-8 python *)"
     ]
   }
 }

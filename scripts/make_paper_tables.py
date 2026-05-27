@@ -315,80 +315,141 @@ def _write_table(path: Path, title: str, table: pd.DataFrame) -> None:
 
 
 def _build_tables(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
-    h1 = df.dropna(subset=["alignment", "uniformity", "effective_rank"], how="all").copy()
-    h1["projector"] = h1["head"].map(_head_family)
-    table_h1 = _summarize(
-        h1,
-        ["projector"],
-        ["alignment", "uniformity", "effective_rank"],
-        {"projector": ["MLP", "KAN", "res_KAN"]},
+    # Each hypothesis isolates EXACTLY ONE experimental factor:
+    # H1: head architecture     (fixed: InfoNCE loss, no scorer)
+    # H2: loss function         (fixed: MLP head)
+    # H3: scorer architecture   (fixed: MLP head, FN-weighted loss)
+    # H4: edge feature usage    (fixed: FastKAN head, edge-aware loss)
+    #
+    # Rows are selected by explicit cell_id so each table varies one factor
+    # while holding the rest constant. A cell absent from the CSV is simply
+    # omitted (a partial ablation yields a partial table); the per-hypothesis
+    # coverage summary reports which required cells are still missing.
+    tables: dict[str, pd.DataFrame] = {}
+
+    def _auroc(values: pd.Series) -> str:
+        return _fmt_metric(values, digits=4)
+
+    def _rank(values: pd.Series) -> str:
+        return _fmt_metric(values, digits=2)
+
+    def _cell_slice(cells: list[str]) -> pd.DataFrame:
+        sub = df[df["cell_id"].astype(str).isin(cells)].copy()
+        if not sub.empty:
+            sub["cell_id"] = pd.Categorical(
+                sub["cell_id"].astype(str), categories=cells, ordered=True
+            )
+        return sub
+
+    # H1: head architecture — InfoNCE rows only, no scorer.
+    h1 = _cell_slice(["mlp_infonce", "kan_infonce", "reskan_infonce"])
+    if not h1.empty:
+        agg = {
+            "head": ("head", "first"),
+            "params_total": ("params_total", _fmt_params),
+            "n_seeds": ("seed", "nunique"),
+            "macro_auroc": ("macro_auroc", _auroc),
+            "alignment": ("alignment", _auroc),
+            "uniformity": ("uniformity", _auroc),
+            "effective_rank": ("effective_rank", _rank),
+        }
+        if "macro_auroc_knn" in h1.columns:
+            agg["macro_auroc_knn"] = ("macro_auroc_knn", _auroc)
+        tables["table_h1.md"] = (
+            h1.groupby("cell_id", observed=True).agg(**agg).reset_index()
+        )
+
+    # H2: loss function — MLP head rows only (InfoNCE vs FN-weighted).
+    h2 = _cell_slice(["mlp_infonce", "mlp_fn_mlp"])
+    if not h2.empty:
+        tables["table_h2.md"] = (
+            h2.groupby("cell_id", observed=True)
+            .agg(
+                head=("head", "first"),
+                loss=("loss", "first"),
+                scorer=("scorer", "first"),
+                n_seeds=("seed", "nunique"),
+                macro_auroc=("macro_auroc", _auroc),
+                rare_disease_auroc=("rare_disease_auroc", _auroc),
+                mAP=("mAP", _auroc),
+            )
+            .reset_index()
+        )
+
+    # H3: scorer architecture — MLP head + FN-weighted (MLP vs KAN scorer);
+    # cross-checks append KAN-head and edge MLP-vs-KAN scorer pairs.
+    h3 = _cell_slice(
+        ["mlp_fn_mlp", "mlp_fn_kan", "kan_fn_kan",
+         "edge_contrastive", "edge_contrastive_kan"]
     )
+    if not h3.empty:
+        tables["table_h3.md"] = (
+            h3.groupby("cell_id", observed=True)
+            .agg(
+                head=("head", "first"),
+                scorer=("scorer", "first"),
+                params_total=("params_total", _fmt_params),
+                n_seeds=("seed", "nunique"),
+                macro_auroc=("macro_auroc", _auroc),
+                mAP=("mAP", _auroc),
+            )
+            .reset_index()
+        )
 
-    table_h2 = _summarize_h2_with_rare(df)
-
-    h3 = df[_edge_off(df)].copy()
-    h3["loss_family"] = h3["loss"].map(_loss_family)
-    h3["scorer_variant"] = h3["scorer"].map(_scorer_family)
-    h3 = h3[(h3["loss_family"] == "FN-weighted") & h3["scorer_variant"].notna()]
-    table_h3 = _summarize(
-        h3,
-        ["scorer_variant"],
-        ["macro_auroc"],
-        {"scorer_variant": ["FN+MLP_scorer", "FN+KAN_scorer"]},
+    # H4: edge feature usage — FastKAN head, varying edge features / aux loss.
+    h4 = _cell_slice(
+        ["zonly_fn", "edge_scorer_no_aux", "edge_contrastive", "edge_align"]
     )
+    if not h4.empty:
+        tables["table_h4.md"] = (
+            h4.groupby("cell_id", observed=True)
+            .agg(
+                scorer=("scorer", "first"),
+                lambda_edge=("lambda_edge", "first"),
+                lambda_edge_align=("lambda_edge_align", "first"),
+                n_seeds=("seed", "nunique"),
+                macro_auroc=("macro_auroc", _auroc),
+                rare_disease_auroc=("rare_disease_auroc", _auroc),
+                mAP=("mAP", _auroc),
+            )
+            .reset_index()
+        )
 
-    h4 = df.copy()
-    h4["edge_mode"] = h4.apply(_edge_mode, axis=1)
-    is_edge = (
-        h4["loss"].astype(str).str.contains("edge", case=False, na=False)
-        | h4["scorer"].astype(str).str.contains("edge", case=False, na=False)
-        | h4["cell_id"].astype(str).str.contains("edge|z_only", case=False, na=False)
-        | h4["lambda_edge"].fillna(0).ne(0)
-        | h4["lambda_edge_align"].fillna(0).ne(0)
-    )
-    h4 = h4[is_edge]
-    h4["edge_align"] = h4["lambda_edge_align"].fillna(0).gt(0).map({True: "on", False: "off"})
-    table_h4 = _summarize(
-        h4,
-        ["edge_mode", "lambda_edge", "edge_align"],
-        ["macro_auroc", "rare_disease_auroc"],
-        {"edge_mode": ["z-only", "edge-aware", "edge-align", "edge-aware + edge-align"]},
-    )
-    return {
-        "table_h1.md": table_h1,
-        "table_h2.md": table_h2,
-        "table_h3.md": table_h3,
-        "table_h4.md": table_h4,
-    }
+    return tables
 
 
-def _print_hypothesis_summary(df: pd.DataFrame, tables: dict[str, pd.DataFrame]) -> None:
-    """Print which hypotheses have enough seeds and which are still missing cells."""
+def _print_hypothesis_summary(df: pd.DataFrame) -> None:
+    """Report per-hypothesis cell coverage and seed depth from the source rows.
+
+    Coverage is judged against the exact cell_id list each hypothesis isolates,
+    so a partially complete ablation CSV prints precisely which cells are still
+    missing rather than a derived-label guess.
+    """
     print("\n── Hypothesis Data Coverage ──────────────────────────────────")
+    cell_id = df["cell_id"].astype(str)
 
-    def _gate(label: str, sub_df: pd.DataFrame, required_cells: list[str]) -> None:
-        if sub_df.empty:
-            print(f"  {label}: NO DATA — run ablate.py")
-            return
-        n_seeds = sub_df.get("n_seeds", pd.Series(dtype=float))
-        if isinstance(n_seeds, pd.Series):
-            min_seeds = int(pd.to_numeric(n_seeds, errors="coerce").min() or 0)
+    def _gate(label: str, required_cells: list[str]) -> None:
+        seeds = {
+            c: int(df.loc[cell_id == c, "seed"].nunique()) for c in required_cells
+        }
+        missing = [c for c, n in seeds.items() if n == 0]
+        if len(missing) == len(required_cells):
+            print(f"  {label}: NO DATA — run ablate.py for {required_cells}")
+        elif missing:
+            print(f"  {label}: INCOMPLETE — missing cells: {missing}")
+        elif min(seeds.values()) < _MIN_SEEDS:
+            low = {c: n for c, n in seeds.items() if n < _MIN_SEEDS}
+            print(f"  {label}: PARTIAL — cells below {_MIN_SEEDS} seeds: {low}")
         else:
-            min_seeds = 0
-        present = set(sub_df.iloc[:, 0].astype(str).tolist()) if not sub_df.empty else set()
-        missing_cells = [c for c in required_cells if c not in present]
-        if missing_cells:
-            print(f"  {label}: INCOMPLETE — missing cells: {missing_cells}")
-        elif min_seeds < _MIN_SEEDS:
-            print(f"  {label}: PARTIAL — min seeds={min_seeds} (need {_MIN_SEEDS})")
-        else:
-            print(f"  {label}: READY ({min_seeds} seeds per cell)")
+            print(f"  {label}: READY ({min(seeds.values())}+ seeds per required cell)")
 
-    _gate("H1 (KAN geometry)", tables["table_h1.md"], ["MLP", "KAN", "res_KAN"])
-    _gate("H2 (FN-weighted loss)", tables["table_h2.md"], ["InfoNCE", "FN-weighted"])
-    _gate("H3 (KAN scorer)", tables["table_h3.md"], ["FN+MLP_scorer", "FN+KAN_scorer"])
-    _gate("H4 (edge signals)", tables["table_h4.md"],
-          ["z-only", "edge-aware", "edge-align"])
+    _gate("H1 (head architecture)", ["mlp_infonce", "kan_infonce", "reskan_infonce"])
+    _gate("H2 (FN-weighted loss)", ["mlp_infonce", "mlp_fn_mlp"])
+    _gate("H3 (KAN scorer)", ["mlp_fn_mlp", "mlp_fn_kan"])
+    _gate(
+        "H4 (edge signals)",
+        ["zonly_fn", "edge_scorer_no_aux", "edge_contrastive", "edge_align"],
+    )
     print("──────────────────────────────────────────────────────────────\n")
 
 
@@ -416,7 +477,7 @@ def main() -> None:
         _write_table(out_dir / filename, titles[filename], table)
     print(f"[tables] wrote {len(tables)} tables to {out_dir}")
 
-    _print_hypothesis_summary(df, tables)
+    _print_hypothesis_summary(df)
 
 
 if __name__ == "__main__":
