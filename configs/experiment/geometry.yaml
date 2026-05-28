@@ -17,7 +17,7 @@ geometry:
   alignment_split: train
   max_samples: 2048           # set null for full pdist; keeps smoke runs bounded
   seed: 42
-  device: cpu
+  device: cuda
 
 # Metadata written to geometry.csv row
 meta:

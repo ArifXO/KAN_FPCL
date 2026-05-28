@@ -89,8 +89,16 @@ _HYPOTHESIS_DIR = {
 }
 
 
-def _train(cell: DictConfig, seed: int, output_root: str, project_root: Path) -> Path:
+def _train(
+    cell: DictConfig,
+    seed: int,
+    output_root: str,
+    project_root: Path,
+    global_overrides: list[str] | None = None,
+) -> Path:
     overrides = list(cell.get("overrides", []))
+    if global_overrides:
+        overrides.extend(global_overrides)
     cmd = [
         sys.executable, "-m", str(cell.train_script),
         f"--config-name={cell.train_config}",
@@ -142,6 +150,7 @@ def _run_cell(
     probe_csv: Path,
     geom_csv: Path,
     project_root: Path,
+    global_overrides: list[str] | None = None,
 ) -> None:
     row = {
         "cell_id": cell.cell_id,
@@ -162,7 +171,7 @@ def _run_cell(
 
     t0 = time.time()
     try:
-        ckpt_dir = _train(cell, seed, output_root, project_root)
+        ckpt_dir = _train(cell, seed, output_root, project_root, global_overrides)
         probe_row = _probe(ckpt_dir, cell, seed, probe_csv, project_root)
         geom_row = _geometry(ckpt_dir, cell, seed, geom_csv, project_root)
         row.update({
@@ -204,12 +213,21 @@ def main(cfg: DictConfig) -> None:
     out_csv = Path(cfg.ablate.output_csv)
     probe_csv = project_root / cfg.ablate.probe_csv
     geom_csv = project_root / cfg.ablate.geometry_csv
+    global_overrides = [str(item) for item in cfg.ablate.get("global_overrides", [])]
 
     n = sum(1 for _ in cfg.ablate.cells) * len(seeds)
     print(f"[ablate] {n} (cell x seed) combinations -> {out_csv}")
     for cell in cfg.ablate.cells:
         for seed in seeds:
-            _run_cell(cell, int(seed), out_csv, probe_csv, geom_csv, project_root)
+            _run_cell(
+                cell,
+                int(seed),
+                out_csv,
+                probe_csv,
+                geom_csv,
+                project_root,
+                global_overrides,
+            )
 
 
 if __name__ == "__main__":

@@ -17,7 +17,7 @@ run:
   output_root: runs/checkpoints
   seed: 42
   deterministic: false
-  device: cpu
+  device: cuda
 
 train:
   max_steps: 5

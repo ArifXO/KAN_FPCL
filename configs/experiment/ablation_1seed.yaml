@@ -1,0 +1,13 @@
+# configs/experiment/ablation_1seed.yaml
+# Full ablation matrix with a single seed for quicker hypothesis sweeps.
+
+defaults:
+  - ablation
+  - _self_
+
+ablate:
+  output_csv: runs/results/ablation_1seed_master.csv
+  probe_csv: runs/results/_ablate_1seed_probe.csv
+  geometry_csv: runs/results/_ablate_1seed_geometry.csv
+  seeds: [42]
+  global_overrides: []

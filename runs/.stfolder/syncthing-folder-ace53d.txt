@@ -1,0 +1,5 @@
+# This directory is a Syncthing folder marker.
+# Do not delete.
+
+folderID: vbonk-9p7rt
+created: 2026-05-28T15:52:17+06:00
