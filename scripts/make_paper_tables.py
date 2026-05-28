@@ -22,13 +22,6 @@ PROJECT_ROOT = Path(os.environ.get("PROJECT_ROOT", Path(__file__).resolve().pare
 # ChestMNIST: rarest 3 classes by frequency (hernia ~0.2%, emphysema ~2%, fibrosis ~1.5%)
 RARE_CLASSES = ("hernia", "emphysema", "fibrosis")
 
-_RUNS_RESULTS = PROJECT_ROOT / "runs" / "results"
-REQUIRED = {
-    "probe": _RUNS_RESULTS / "probe_results.csv",
-    "ablation": _RUNS_RESULTS / "ablation_master.csv",
-    "geometry": _RUNS_RESULTS / "geometry.csv",
-}
-
 CORE_COLUMNS = {
     "cell_id",
     "head",
@@ -52,23 +45,6 @@ METRIC_ALIASES = {
 _MIN_SEEDS = 3
 
 
-def _check_required_inputs() -> None:
-    for name, p in REQUIRED.items():
-        if not p.exists():
-            raise FileNotFoundError(
-                f"Required file missing: {p}\n"
-                f"  Source: '{name}' CSV produced by scripts/ablate.py.\n"
-                f"Run scripts/ablate.py first to generate all results.\n"
-                f"Cannot generate paper tables without complete data."
-            )
-        df = pd.read_csv(p)
-        if len(df) == 0:
-            raise ValueError(
-                f"{p} exists but has no data rows.\n"
-                f"Run scripts/ablate.py first to populate '{name}'."
-            )
-
-
 def _parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--input", default="runs/results/ablation_master.csv",
@@ -82,9 +58,15 @@ def _parse_args() -> argparse.Namespace:
 def _read_ablation(path: Path) -> pd.DataFrame:
     if not path.exists():
         raise FileNotFoundError(
-            f"Expected ablation CSV at {path}. Run scripts/ablate.py first or pass --input."
+            f"Expected ablation CSV at {path}.\n"
+            f"Run scripts/ablate.py first, or pass --input <path> to point to a different file."
         )
     df = pd.read_csv(path)
+    if len(df) == 0:
+        raise ValueError(
+            f"{path} exists but has no data rows.\n"
+            f"Run scripts/ablate.py first to populate it."
+        )
     missing = sorted(CORE_COLUMNS - set(df.columns))
     if missing:
         raise ValueError(f"{path} is missing required columns: {missing}")
@@ -447,34 +429,45 @@ def _print_hypothesis_summary(df: pd.DataFrame) -> None:
     print("\n── Hypothesis Data Coverage ──────────────────────────────────")
     cell_id = df["cell_id"].astype(str)
 
-    def _gate(label: str, required_cells: list[str]) -> None:
+    def _gate(tag: str, label: str, required_cells: list[str]) -> None:
         seeds = {
             c: int(df.loc[cell_id == c, "seed"].nunique()) for c in required_cells
         }
         missing = [c for c, n in seeds.items() if n == 0]
+        n_present = len(required_cells) - len(missing)
         if len(missing) == len(required_cells):
-            print(f"  {label}: NO DATA — run ablate.py for {required_cells}")
+            print(
+                f"  [{tag}] WARNING: Missing cells: {', '.join(missing)} "
+                f"(0/{len(required_cells)} present) — run ablate.py"
+            )
         elif missing:
-            print(f"  {label}: INCOMPLETE — missing cells: {missing}")
+            print(
+                f"  [{tag}] WARNING: Missing cells: {', '.join(missing)} "
+                f"({n_present}/{len(required_cells)} present)"
+            )
         elif min(seeds.values()) < _MIN_SEEDS:
             low = {c: n for c, n in seeds.items() if n < _MIN_SEEDS}
-            print(f"  {label}: PARTIAL — cells below {_MIN_SEEDS} seeds: {low}")
+            print(
+                f"  [{tag}] WARNING: Cells below {_MIN_SEEDS} seeds: {low} — "
+                f"({n_present}/{len(required_cells)} present)"
+            )
         else:
-            print(f"  {label}: READY ({min(seeds.values())}+ seeds per required cell)")
+            print(
+                f"  [{tag}] READY — {label} "
+                f"({min(seeds.values())}+ seeds, {n_present}/{len(required_cells)} cells)"
+            )
 
-    _gate("H1 (head architecture)", ["mlp_infonce", "kan_infonce", "reskan_infonce"])
-    _gate("H2 (FN-weighted loss)", ["mlp_infonce", "mlp_fn_mlp"])
-    _gate("H3 (KAN scorer)", ["mlp_fn_mlp", "mlp_fn_kan"])
+    _gate("H1", "head architecture", ["mlp_infonce", "kan_infonce", "reskan_infonce"])
+    _gate("H2", "FN-weighted loss", ["mlp_infonce", "mlp_fn_mlp"])
+    _gate("H3", "KAN scorer", ["mlp_fn_mlp", "mlp_fn_kan"])
     _gate(
-        "H4 (edge signals)",
+        "H4", "edge signals",
         ["zonly_fn", "edge_scorer_no_aux", "edge_contrastive", "edge_align"],
     )
     print("──────────────────────────────────────────────────────────────\n")
 
 
 def main() -> None:
-    _check_required_inputs()
-
     args = _parse_args()
     in_path = Path(args.input)
     if not in_path.is_absolute():
