@@ -1,6 +1,6 @@
 """Stage 3 evaluation entry point: linear probe + kNN on a saved checkpoint (R6, R8).
 
-Loads encoder+head from a run directory, extracts frozen embeddings on train/val
+Loads encoder+head from a run directory, extracts frozen embeddings on train/val/test
 splits, runs LinearProbe and kNN, then appends a result row to probe_results.csv.
 """
 
@@ -43,9 +43,12 @@ CHESTMNIST_CLASS_NAMES = [
 
 _CSV_COLUMNS = [
     "run_id", "encoder", "head", "loss", "scorer", "dataset", "seed",
-    "params_total", "macro_auroc_linear", "macro_auroc_knn", "mAP",
+    "params_total", "params_scorer", "macro_auroc_linear", "macro_auroc_knn", "mAP",
     "per_class_auroc_linear_json",
     "n_classes_valid",
+    "macro_auroc_linear_test", "macro_auroc_knn_test", "mAP_test",
+    "per_class_auroc_linear_test_json",
+    "n_classes_valid_test",
     "runtime_sec",
 ]
 
@@ -119,9 +122,18 @@ def main(cfg: DictConfig) -> None:
     encoder.load_state_dict({k[len("encoder."):]: v for k, v in state.items() if k.startswith("encoder.")})
     head.load_state_dict({k[len("head."):]: v for k, v in state.items() if k.startswith("head.")})
 
-    params_total = count_parameters(encoder) + count_parameters(head)
+    scorer = None
+    params_scorer = 0
+    if any(k.startswith("scorer.") for k in state):
+        scorer = instantiate(ckpt_cfg.model.scorer).to(device)
+        scorer.load_state_dict({
+            k[len("scorer."):]: v for k, v in state.items()
+            if k.startswith("scorer.")
+        })
+        params_scorer = count_parameters(scorer)
+    params_total = count_parameters(encoder) + count_parameters(head) + params_scorer
 
-    # Build eval-transform loaders (single view) for both train and val.
+    # Build eval-transform loaders (single view) for train/val/test.
     # Cannot reuse get_dataloader() because the train split uses TwoViewTransform.
     mean = list(cfg.data.normalize.mean)
     std = list(cfg.data.normalize.std)
@@ -129,32 +141,86 @@ def main(cfg: DictConfig) -> None:
 
     train_ds = get_dataset(cfg.data, "train", eval_tf)
     val_ds = get_dataset(cfg.data, "val", eval_tf)
+    test_ds = get_dataset(cfg.data, "test", eval_tf)
 
     train_loader = DataLoader(train_ds, batch_size=cfg.data.batch_size,
                               shuffle=False, num_workers=cfg.data.num_workers)
     val_loader = DataLoader(val_ds, batch_size=cfg.data.batch_size,
                             shuffle=False, num_workers=cfg.data.num_workers)
+    test_loader = DataLoader(test_ds, batch_size=cfg.data.batch_size,
+                             shuffle=False, num_workers=cfg.data.num_workers)
 
     t0 = time.time()
     train_emb, train_lbl = _extract_embeddings(encoder, head, train_loader, device)
     val_emb, val_lbl = _extract_embeddings(encoder, head, val_loader, device)
+    test_emb, test_lbl = _extract_embeddings(encoder, head, test_loader, device)
 
     # Identify zero-positive classes in val. Log explicitly; do not silently drop.
     valid_classes = [
         c for c in range(val_lbl.shape[1])
         if 0 < val_lbl[:, c].sum() < val_lbl.shape[0]
+        and train_lbl[:, c].sum() > 0
     ]
     n_classes_valid = len(valid_classes)
-    if n_classes_valid < val_lbl.shape[1]:
-        dropped_ids = [
-            c for c in range(val_lbl.shape[1])
-            if val_lbl[:, c].sum() == 0 or val_lbl[:, c].sum() == val_lbl.shape[0]
-        ]
+    dropped_ids = [
+        c for c in range(val_lbl.shape[1])
+        if val_lbl[:, c].sum() == 0 or val_lbl[:, c].sum() == val_lbl.shape[0]
+    ]
+    if dropped_ids:
         print(
             f"[probe] Warning: {len(dropped_ids)} class(es) have 0 val positives or 0 val negatives "
             f"and are excluded from AUROC (class ids: {dropped_ids}). "
             f"This is expected for fresh/random encoders."
         )
+    dropped_no_train = [
+        c for c in range(val_lbl.shape[1])
+        if 0 < val_lbl[:, c].sum() < val_lbl.shape[0]
+        and train_lbl[:, c].sum() == 0
+    ]
+    if dropped_no_train:
+        print(
+            f"[probe] Warning: {len(dropped_no_train)} class(es) have val positives "
+            f"but 0 train positives and are excluded from AUROC "
+            f"(class ids: {dropped_no_train})."
+        )
+
+    # Identify zero-positive/all-positive classes in test separately. The test
+    # split is the headline evaluation because model_best.pt is selected on val.
+    valid_classes_test = [
+        c for c in range(test_lbl.shape[1])
+        if 0 < test_lbl[:, c].sum() < test_lbl.shape[0]
+        and train_lbl[:, c].sum() > 0
+    ]
+    n_classes_valid_test = len(valid_classes_test)
+    dropped_ids_test = [
+        c for c in range(test_lbl.shape[1])
+        if test_lbl[:, c].sum() == 0 or test_lbl[:, c].sum() == test_lbl.shape[0]
+    ]
+    if dropped_ids_test:
+        print(
+            f"[probe] Warning: {len(dropped_ids_test)} class(es) have 0 test positives or 0 test negatives "
+            f"and are excluded from test AUROC (class ids: {dropped_ids_test}). "
+            f"This is expected for fresh/random encoders."
+        )
+    dropped_no_train_test = [
+        c for c in range(test_lbl.shape[1])
+        if 0 < test_lbl[:, c].sum() < test_lbl.shape[0]
+        and train_lbl[:, c].sum() == 0
+    ]
+    if dropped_no_train_test:
+        print(
+            f"[probe] Warning: {len(dropped_no_train_test)} class(es) have test positives "
+            f"but 0 train positives and are excluded from test AUROC "
+            f"(class ids: {dropped_no_train_test})."
+        )
+
+    for lbl_arr, name in [(train_lbl, "train"), (val_lbl, "val"), (test_lbl, "test")]:
+        if np.any((lbl_arr > 0) & (lbl_arr < 1)):
+            raise ValueError(
+                f"[probe] {name} labels contain fractional values. "
+                "Likely CheXpert LSR. .astype(np.int32) would corrupt 0.5->0. "
+                "Use uncertainty_policy='positive' or 'negative'."
+            )
 
     tr_lbl_f = train_lbl[:, valid_classes].astype(np.int32)
     vl_lbl_f = val_lbl[:, valid_classes].astype(np.int32)
@@ -169,17 +235,34 @@ def main(cfg: DictConfig) -> None:
         k=min(cfg.probe.knn_k, train_emb.shape[0]),
     )
 
+    tr_lbl_test = train_lbl[:, valid_classes_test].astype(np.int32)
+    te_lbl_f = test_lbl[:, valid_classes_test].astype(np.int32)
+
+    probe_out_test = linear_probe(
+        train_emb, tr_lbl_test, test_emb, te_lbl_f,
+        max_iter=cfg.probe.probe_max_iter,
+        C=cfg.probe.probe_C,
+    )
+    knn_out_test = knn_eval(
+        train_emb, tr_lbl_test, test_emb, te_lbl_f,
+        k=min(cfg.probe.knn_k, train_emb.shape[0]),
+    )
+
     runtime = time.time() - t0
     run_id = make_run_id()
 
     names = (
         CHESTMNIST_CLASS_NAMES
         if cfg.data.name == "chestmnist"
-        else [str(i) for i in range(val_lbl.shape[1])]
+        else [str(i) for i in range(test_lbl.shape[1])]
     )
     per_class_json = json.dumps({
         names[i]: round(float(v), 6)
         for i, v in zip(valid_classes, probe_out["per_class_auroc"])
+    })
+    per_class_test_json = json.dumps({
+        names[i]: round(float(v), 6)
+        for i, v in zip(valid_classes_test, probe_out_test["per_class_auroc"])
     })
 
     row = {
@@ -191,21 +274,31 @@ def main(cfg: DictConfig) -> None:
         "dataset": cfg.meta.dataset,
         "seed": cfg.probe.seed,
         "params_total": params_total,
+        "params_scorer": params_scorer,
         "macro_auroc_linear": round(probe_out["macro_auroc"], 6),
         "macro_auroc_knn": round(knn_out["macro_auroc"], 6),
         "mAP": round(probe_out["mAP"], 6),
         "per_class_auroc_linear_json": per_class_json,
         "n_classes_valid": n_classes_valid,
+        "macro_auroc_linear_test": round(probe_out_test["macro_auroc"], 6),
+        "macro_auroc_knn_test": round(knn_out_test["macro_auroc"], 6),
+        "mAP_test": round(probe_out_test["mAP"], 6),
+        "per_class_auroc_linear_test_json": per_class_test_json,
+        "n_classes_valid_test": n_classes_valid_test,
         "runtime_sec": round(runtime, 2),
     }
 
     csv_path = Path(cfg.probe.output_csv)
     _append_csv_row(csv_path, row)
 
-    print(f"[probe] macro_auroc_linear={row['macro_auroc_linear']:.4f}  "
-          f"macro_auroc_knn={row['macro_auroc_knn']:.4f}  "
-          f"mAP={row['mAP']:.4f}  "
-          f"n_classes_valid={n_classes_valid}  runtime={runtime:.1f}s")
+    print(f"[probe] val_macro_auroc_linear={row['macro_auroc_linear']:.4f}  "
+          f"val_macro_auroc_knn={row['macro_auroc_knn']:.4f}  "
+          f"val_mAP={row['mAP']:.4f}  "
+          f"test_macro_auroc_linear={row['macro_auroc_linear_test']:.4f}  "
+          f"test_macro_auroc_knn={row['macro_auroc_knn_test']:.4f}  "
+          f"test_mAP={row['mAP_test']:.4f}  "
+          f"n_classes_valid_val={n_classes_valid}  "
+          f"n_classes_valid_test={n_classes_valid_test}  runtime={runtime:.1f}s")
     print(f"[probe] Row appended to {csv_path}")
 
 

@@ -86,6 +86,14 @@ def _prepare(df: pd.DataFrame, include_smoke: bool, include_failed: bool) -> pd.
     out = df.copy()
     if "status" in out.columns and not include_failed:
         out = out[out["status"].fillna("OK").eq("OK")]
+    dups = out.duplicated(subset=["cell_id", "dataset", "seed"], keep=False)
+    if dups.any():
+        print(
+            f"[make_paper_tables WARNING] {dups.sum()} duplicate (cell_id, dataset, seed) "
+            f"rows. Keeping last. Unique duplicated combos:\n"
+            f"{out.loc[dups, ['cell_id', 'dataset', 'seed']].drop_duplicates().to_string()}"
+        )
+        out = out.drop_duplicates(subset=["cell_id", "dataset", "seed"], keep="last")
     if not include_smoke:
         cell = out["cell_id"].astype(str).str.lower()
         out = out[~cell.str.startswith("smoke")]

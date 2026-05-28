@@ -32,7 +32,7 @@ from omegaconf import DictConfig
 
 _COLUMNS = [
     "cell_id", "head", "loss", "scorer", "lambda_edge", "lambda_edge_align",
-    "dataset", "seed", "params_total", "macro_auroc_linear", "macro_auroc_knn",
+    "dataset", "seed", "params_total", "params_scorer", "macro_auroc_linear", "macro_auroc_knn",
     "mAP", "per_class_auroc_linear_json", "alignment", "uniformity", "effective_rank",
     "runtime_sec", "status",
 ]
@@ -167,6 +167,7 @@ def _run_cell(
         geom_row = _geometry(ckpt_dir, cell, seed, geom_csv, project_root)
         row.update({
             "params_total": probe_row.get("params_total", ""),
+            "params_scorer": probe_row.get("params_scorer", "0"),
             "macro_auroc_linear": probe_row.get("macro_auroc_linear", ""),
             "macro_auroc_knn": probe_row.get("macro_auroc_knn", ""),
             "mAP": probe_row.get("mAP", ""),
