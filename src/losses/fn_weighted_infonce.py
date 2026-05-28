@@ -45,7 +45,8 @@ class FNWeightedInfoNCELoss(nn.Module):
 
     Returns (R7):
         dict with keys ``loss``, ``pos_sim_mean``, ``neg_sim_mean``,
-        ``p_fn_mean``, ``p_fn_max``, ``downweighted_fraction``, ``temperature``.
+        ``p_fn_mean``, ``p_fn_max``, ``p_fn_mean_raw``, ``p_fn_max_raw``,
+        ``p_fn_at_cap_fraction``, ``downweighted_fraction``, ``temperature``.
     """
 
     def __init__(
@@ -105,6 +106,12 @@ class FNWeightedInfoNCELoss(nn.Module):
         pos_mask = build_positive_mask(batch).to(z.device)
         neg_mask = ~pos_mask & ~diag_mask
 
+        # Raw scorer diagnostics (before clipping) — detect collapse where
+        # the scorer saturates above max_fn_weight and the clipped stats look fine.
+        raw_p_fn_mean = p_fn.mean().detach()
+        raw_p_fn_max = p_fn.max().detach()
+        at_cap_fraction = (p_fn >= self.max_fn_weight).float().mean().detach()
+
         # Tile p_fn to [2B, 2B] so the same FN belief applies to (v1,v1),
         # (v1,v2), (v2,v1), (v2,v2) views of the same pair of underlying images.
         p_fn_clamped = p_fn.clamp(min=0.0, max=self.max_fn_weight)
@@ -142,6 +149,9 @@ class FNWeightedInfoNCELoss(nn.Module):
             "neg_sim_mean": sim_raw[neg_mask].mean().detach(),
             "p_fn_mean": neg_p.mean().detach(),
             "p_fn_max": neg_p.max().detach(),
+            "p_fn_mean_raw": raw_p_fn_mean,
+            "p_fn_max_raw": raw_p_fn_max,
+            "p_fn_at_cap_fraction": at_cap_fraction,
             "downweighted_fraction": (neg_p > 0.5).float().mean().detach(),
             "temperature": torch.tensor(self.temperature, device=z.device),
         }

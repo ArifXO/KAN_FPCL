@@ -94,6 +94,9 @@ def test_returns_required_dict_keys():
         "neg_sim_mean",
         "p_fn_mean",
         "p_fn_max",
+        "p_fn_mean_raw",
+        "p_fn_max_raw",
+        "p_fn_at_cap_fraction",
         "downweighted_fraction",
         "temperature",
     ):
@@ -266,3 +269,14 @@ def test_max_fn_weight_caps_denominator():
     out = loss_fn(z_cat, p_fn_max)
     # With max_fn_weight=0.5, weights floor at 0.5, loss should be substantial
     assert out["loss"].item() > 0.1, "loss too low — cap not working"
+
+
+def test_raw_pfn_diagnostics_visible():
+    """Raw p_fn stats must be reported before clipping."""
+    loss_fn = FNWeightedInfoNCELoss(temperature=0.1, max_fn_weight=0.5)
+    z = _two_view_batch(batch=4, dim=8)
+    p_fn = torch.full((4, 4), 0.9)  # raw 0.9, will be clipped to 0.5
+    out = loss_fn(z, p_fn)
+    assert out["p_fn_max_raw"].item() == pytest.approx(0.9, abs=1e-4)
+    assert out["p_fn_max"].item() == pytest.approx(0.5, abs=1e-4)
+    assert out["p_fn_at_cap_fraction"].item() == pytest.approx(1.0, abs=1e-4)

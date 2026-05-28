@@ -172,6 +172,8 @@ def main(cfg: DictConfig) -> None:
                     f"edge_a={float(out['edge_align_loss']):.4f} "
                     f"p_fn_mean={float(out['p_fn_mean']):.4f} "
                     f"p_fn_max={out['p_fn_max'].item():.4f} "
+                    f"p_fn_raw_max={out['p_fn_max_raw'].item():.4f} "
+                    f"at_cap={out['p_fn_at_cap_fraction'].item():.4f} "
                     f"downweighted={out['downweighted_fraction'].item():.4f} "
                     f"lr={scheduler.get_last_lr()[0]:.2e}"
                 )
