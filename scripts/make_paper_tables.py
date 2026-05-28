@@ -277,7 +277,7 @@ def _markdown(df: pd.DataFrame) -> str:
     try:
         return df.to_markdown(index=False)
     except ImportError:
-        display = df.fillna("NA").astype(str)
+        display = df.astype({c: "object" for c, t in df.dtypes.items() if str(t) == "category"}).fillna("NA").astype(str)
         cols = list(display.columns)
         rows = display.to_dict("records")
         widths = {
@@ -426,7 +426,7 @@ def _print_hypothesis_summary(df: pd.DataFrame) -> None:
     so a partially complete ablation CSV prints precisely which cells are still
     missing rather than a derived-label guess.
     """
-    print("\n── Hypothesis Data Coverage ──────────────────────────────────")
+    print("\n-- Hypothesis Data Coverage ------------------------------------------")
     cell_id = df["cell_id"].astype(str)
 
     def _gate(tag: str, label: str, required_cells: list[str]) -> None:
@@ -464,7 +464,7 @@ def _print_hypothesis_summary(df: pd.DataFrame) -> None:
         "H4", "edge signals",
         ["zonly_fn", "edge_scorer_no_aux", "edge_contrastive", "edge_align"],
     )
-    print("──────────────────────────────────────────────────────────────\n")
+    print("----------------------------------------------------------------------\n")
 
 
 def main() -> None:

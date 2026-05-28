@@ -51,7 +51,7 @@ class EdgeAwareFNWeightedInfoNCELoss(nn.Module):
             *and* the scorer producing ``p_fn`` did not consume edges itself
             (in which case the auxiliary terms simply report 0).
 
-    Returns (R7) a 13-key dict.
+    Returns (R7) a 16-key dict.
     """
 
     def __init__(
@@ -176,6 +176,9 @@ class EdgeAwareFNWeightedInfoNCELoss(nn.Module):
             "lambda_edge_align": torch.tensor(self.lambda_edge_align, device=device),
             "p_fn_mean": fn_out["p_fn_mean"],
             "p_fn_max": fn_out["p_fn_max"],
+            "p_fn_mean_raw": fn_out["p_fn_mean_raw"],
+            "p_fn_max_raw": fn_out["p_fn_max_raw"],
+            "p_fn_at_cap_fraction": fn_out["p_fn_at_cap_fraction"],
             "downweighted_fraction": fn_out["downweighted_fraction"],
             "edge_pos_sim_mean": edge_pos_sim_mean,
             "edge_neg_sim_mean": edge_neg_sim_mean,
