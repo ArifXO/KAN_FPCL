@@ -6,6 +6,14 @@ only; they are not evidence for H1-H4.
 
 ---
 
+## Current Blocker
+
+Run `scripts/ablate.py` to produce `runs/results/ablation_master.csv`.
+All 4 hypotheses are code-ready but not concluded — no full training runs have
+been executed yet. The CSV currently has only a header row.
+
+---
+
 ## Fix Log (May 2026)
 
 Changes made or reconciled during Prompts 0-9:
@@ -14,7 +22,7 @@ Changes made or reconciled during Prompts 0-9:
   now; CheXpert training/probe/geometry integration is deferred.
 - probe_results.csv: Moved to `reports/tables/probe_results.csv`; fake CheXpert
   result rows removed.
-- ablation.yaml: Expanded to 9 ChestMNIST cells, `lambda_edge` fixed at `0.05`
+- ablation.yaml: Expanded to 11 ChestMNIST cells, `lambda_edge` fixed at `0.05`
   for edge treatment, and 3 seeds configured: `[42, 1337, 2024]`.
 - KANPairScorer: Implemented and tested, so H3 is now testable.
 - Training scripts: Cosine LR, gradient clipping, validation monitoring, and
@@ -22,11 +30,12 @@ Changes made or reconciled during Prompts 0-9:
 - probe.py: Per-class AUROC serialization added, with ChestMNIST class names;
   dataset routing is explicit and does not silently route CheXpert through
   ChestMNIST.
-- Full training configs: 9 `full_*.yaml` configs added, each set to 10K steps.
+- Full training configs: 11 `full_*.yaml` configs added, each set to 10K steps.
 - p_fn collapse guard: Full FN configs include `lambda_pfn_reg=0.01`; both
   `configs/loss/fn_weighted_mlp.yaml` and `configs/loss/edge_aware.yaml` use
   `max_fn_weight=0.5`, keeping H2/H3/H4 cells on a fair footing.
-- make_paper_tables.py: Guard clauses and per-class H2 rare-disease rows added.
+- make_paper_tables.py: Guard clauses, per-hypothesis coverage warnings, and
+  per-class H2 rare-disease rows added.
 - All smoke tests passing: `pytest tests/test_smoke.py -q` -> 5 passed on
   2026-05-26.
 
@@ -269,31 +278,33 @@ training/probe/geometry yet.
 
 **Status:** ☐ In Progress
 
-**Gate:** `reports/tables/ablation_master.csv` has all 9 cells x 3 seeds, no
+**Gate:** `runs/results/ablation_master.csv` has all 11 cells x 3 seeds, no
 FAILED rows, and all four paper tables are generated.
 
 **Current evidence:**
 
 - `scripts/ablate.py` exists.
-- `configs/experiment/ablation.yaml` has 9 cells and seeds `[42, 1337, 2024]`.
-- 9 full training configs exist:
+- `configs/experiment/ablation.yaml` has 11 cells and seeds `[42, 1337, 2024]`.
+- 11 full training configs exist:
   - `full_mlp_infonce.yaml`
   - `full_kan_infonce.yaml`
   - `full_reskan_infonce.yaml`
   - `full_mlp_fn_mlp.yaml`
   - `full_mlp_fn_kan.yaml`
-  - `full_reskan_fn_kan.yaml`
-  - `full_edge_off.yaml`
+  - `full_reskan_fn_kan.yaml` (kan_fn_kan cell)
+  - `full_edge_scorer_no_aux.yaml`
   - `full_edge_l005.yaml`
   - `full_edge_align_l005.yaml`
-- `scripts/make_paper_tables.py` exists and has guard clauses plus per-class
-  rare-disease table support.
-- `reports/tables/ablation_master.csv` currently has only a header row.
+  - `full_zonly_fn.yaml`
+  - `full_edge_l005_kan_scorer.yaml` (edge_contrastive_kan cell)
+- `scripts/make_paper_tables.py` exists with `--input` flag, guard clauses,
+  per-hypothesis coverage warnings, and per-class rare-disease table support.
+- `runs/results/ablation_master.csv` currently has only a header row.
 
 **Open items:**
 
-- Run full ablation: 9 cells x 3 seeds = 27 completed rows.
-- Verify zero `FAILED` rows in `reports/tables/ablation_master.csv`.
+- Run full ablation: 11 cells x 3 seeds = 33 completed rows.
+- Verify zero `FAILED` rows in `runs/results/ablation_master.csv`.
 - Generate and review:
   - `reports/tables/table_h1.md`
   - `reports/tables/table_h2.md`
@@ -305,10 +316,10 @@ FAILED rows, and all four paper tables are generated.
 
 ## Current Next Actions
 
-1. Run the 27-row ChestMNIST ablation matrix.
+1. Run the 33-row ChestMNIST ablation matrix (11 cells × 3 seeds).
 2. Run `scripts/make_paper_tables.py` after ablation rows exist.
-4. Review generated tables and record H1-H4 outcomes.
-5. Keep CheXpert deferred until Stage 9 is deliberately activated.
+3. Review generated tables and record H1-H4 outcomes.
+4. Keep CheXpert deferred until Stage 9 is deliberately activated.
 
 ---
 
@@ -321,10 +332,10 @@ Completed Stages: 0, 1, 2, 3, 4, 5, 6, 7, 7.5, 8
 In Progress: 10
 Not Started / Deferred: 9
 
-H1 Result: not decided - requires Stage 10 full ablation tables
-H2 Result: not decided - requires Stage 10 full ablation tables
-H3 Result: not decided - requires Stage 10 full ablation tables
-H4 Result: not decided - requires Stage 10 full ablation tables
+H1 Result: not decided — requires 33-row ablation (11 cells × 3 seeds)
+H2 Result: not decided — requires 33-row ablation (11 cells × 3 seeds)
+H3 Result: not decided — requires 33-row ablation (11 cells × 3 seeds)
+H4 Result: not decided — requires 33-row ablation (11 cells × 3 seeds)
 
 Thesis Status: In Progress
 ```

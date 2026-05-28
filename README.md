@@ -1,6 +1,6 @@
 # KAN-FPCL: Functional Pathway Contrastive Learning for Chest X-Ray Representation
 
-**Thesis | May 2026 | Python 3.11+**
+**Thesis | May 2026 | Python 3.10+**
 
 This repository implements the **KAN-FPCL thesis**, which investigates whether **Kolmogorov-Arnold Networks (KAN)** and **false-negative-aware contrastive learning** improve chest X-ray (CXR) representation quality over standard baselines.
 
@@ -315,20 +315,23 @@ On frozen eval embeddings:
 - **Off-diagonal covariance norm:** Low = no spurious correlations.
 
 ### **Ablation Grid** (Stage 10)
-| Head | Loss | Scorer | λ_edge | Dataset |
-|---|---|---|---|---|
-| MLP | InfoNCE | — | — | Both |
-| KAN | InfoNCE | — | — | Both |
-| Res-KAN | InfoNCE | — | — | Both |
-| MLP | FN-weighted | MLP | — | Both |
-| MLP | FN-weighted | KAN | — | Both |
-| Res-KAN | FN-weighted | KAN | — | Both |
-| Res-KAN | EdgeAware-FN | EdgeAware(KAN) | 0.0 | Both |
-| Res-KAN | EdgeAware-FN | EdgeAware(KAN) | 0.05 | Both |
-| Res-KAN | EdgeAware-FN | EdgeAware(MLP) | 0.05 | Both |
 
-**3 seeds (default):** [42, 1337, 2024]
-**5 seeds (full):** [42, 1337, 2024, 7, 9001]
+| Cell ID | Head | Loss | Scorer | λ_edge | λ_align | Hypothesis |
+|---|---|---|---|---|---|---|
+| mlp_infonce | MLP | InfoNCE | — | — | — | H1 baseline |
+| kan_infonce | FastKAN | InfoNCE | — | — | — | H1 |
+| reskan_infonce | Res-KAN | InfoNCE | — | — | — | H1 |
+| mlp_fn_mlp | MLP | FN-weighted | MLP | — | — | H2 |
+| mlp_fn_kan | MLP | FN-weighted | KAN | — | — | H3 |
+| kan_fn_kan | FastKAN | FN-weighted | KAN | — | — | H3+H1 |
+| zonly_fn | FastKAN | EdgeAware-FN | MLP (z-only) | 0.0 | 0.0 | H4 baseline |
+| edge_scorer_no_aux | FastKAN | EdgeAware-FN | EdgeAware-MLP | 0.0 | 0.0 | H4 control |
+| edge_contrastive | FastKAN | EdgeAware-FN | EdgeAware-MLP | 0.05 | 0.0 | H4 treatment A |
+| edge_align | FastKAN | EdgeAware-FN | EdgeAware-MLP | 0.0 | 0.05 | H4 treatment B |
+| edge_contrastive_kan | FastKAN | EdgeAware-FN | EdgeAware-KAN | 0.05 | 0.0 | H3 cross-check |
+
+**3 seeds (default):** [42, 1337, 2024] → 33 rows total
+**5 seeds (full thesis):** [42, 1337, 2024, 7, 9001] → 55 rows total
 
 ---
 
@@ -432,5 +435,5 @@ For questions about implementation, rules, or subagent behavior:
 ---
 
 **Last Updated:** May 2026  
-**Current Stage:** [To be filled in]  
-**Status:** [Development/Testing/Complete]
+**Current Stage:** 10 (Ablation — configs ready, full runs not yet executed)  
+**Status:** Code-ready for all hypotheses; awaiting `scripts/ablate.py` execution
