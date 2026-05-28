@@ -168,7 +168,7 @@ def _fmt_metric(values: pd.Series, digits: int = 4) -> str:
         return "NA"
     mean = vals.mean()
     std = vals.std(ddof=1) if len(vals) > 1 else 0.0
-    return f"{mean:.{digits}f} ± {std:.{digits}f}"
+    return f"{mean:.{digits}f} +/- {std:.{digits}f}"
 
 
 def _fmt_params(values: pd.Series) -> str:
@@ -268,7 +268,7 @@ def _summarize_h2_with_rare(df: pd.DataFrame) -> pd.DataFrame:
                 s = pd.Series(vals)
                 mean = s.mean()
                 std = s.std(ddof=1) if len(vals) > 1 else 0.0
-                row[col_name] = f"{mean:.4f} ± {std:.4f}"
+                row[col_name] = f"{mean:.4f} +/- {std:.4f}"
             else:
                 row[col_name] = "NA"
         rows.append(row)
