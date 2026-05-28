@@ -6,10 +6,10 @@
 # was disabled, but use_edge_features=true; only the aux losses are zeroed.)
 
 defaults:
-  - _self_
   - /data: chestmnist
   - /model: edge_aware_mlp
   - /loss: edge_aware
+  - _self_
 
 hydra:
   searchpath:

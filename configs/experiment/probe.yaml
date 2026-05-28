@@ -2,9 +2,9 @@
 # Stage 3: linear-probe + kNN evaluation on a saved checkpoint (R6, R8).
 
 defaults:
-  - _self_
   - /data: chestmnist
   - /model: mlp_baseline
+  - _self_
 
 hydra:
   searchpath:

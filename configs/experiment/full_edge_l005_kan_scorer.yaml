@@ -4,10 +4,10 @@
 # scorer architecture (varied).
 
 defaults:
-  - _self_
   - /data: chestmnist
   - /model: edge_aware_kan
   - /loss: edge_aware
+  - _self_
 
 hydra:
   searchpath:

@@ -4,10 +4,10 @@
 # Param check: FastKANProjector must be within ±15% of MLPHead (R1).
 
 defaults:
-  - _self_
   - /data: chestmnist
   - /model: kan_head
   - /loss: infonce
+  - _self_
 
 hydra:
   searchpath:

@@ -4,10 +4,10 @@
 # No edge fingerprints, no auxiliary edge losses.
 
 defaults:
-  - _self_
   - /data: chestmnist
   - /model: edge_aware_mlp_zonly
   - /loss: edge_aware
+  - _self_
 
 hydra:
   searchpath:

@@ -2,9 +2,9 @@
 # Stage 8: geometry metrics on a saved checkpoint (R6).
 
 defaults:
-  - _self_
   - /data: chestmnist
   - /model: mlp_baseline
+  - _self_
 
 hydra:
   searchpath:

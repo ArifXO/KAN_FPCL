@@ -3,10 +3,10 @@
 # Tests whether the residual warp improves geometry vs MLP baseline.
 
 defaults:
-  - _self_
   - /data: chestmnist
   - /model: residual_fastkan_warp
   - /loss: infonce
+  - _self_
 
 hydra:
   searchpath:

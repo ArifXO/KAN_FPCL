@@ -5,10 +5,10 @@
 # lambdas=0; flip `loss.lambda_edge` on the CLI to activate H4 wiring.
 
 defaults:
-  - _self_
   - /data: chestmnist
   - /model: edge_aware_mlp
   - /loss: edge_aware
+  - _self_
 
 hydra:
   searchpath:

@@ -3,10 +3,10 @@
 # Param reference: MLPHead(512→512→128) ≈ 329K head params (R1 anchor).
 
 defaults:
-  - _self_
   - /data: chestmnist
   - /model: mlp_baseline
   - /loss: infonce
+  - _self_
 
 hydra:
   searchpath:

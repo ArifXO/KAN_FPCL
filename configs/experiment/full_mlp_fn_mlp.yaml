@@ -4,10 +4,10 @@
 # max_fn_weight=0.5 prevents scorer collapse (CLAUDE.md Pitfall #5).
 
 defaults:
-  - _self_
   - /data: chestmnist
   - /model: mlp_scorer
   - /loss: fn_weighted_mlp
+  - _self_
 
 hydra:
   searchpath:

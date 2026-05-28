@@ -3,10 +3,10 @@
 # end-to-end and writes the R8 artifact set. Not a real training run.
 
 defaults:
-  - _self_
   - /data: chestmnist
   - /model: mlp_scorer
   - /loss: fn_weighted_mlp
+  - _self_
 
 hydra:
   searchpath:

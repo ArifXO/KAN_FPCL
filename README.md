@@ -130,11 +130,13 @@ Outputs: `ablation_master.csv` with all cells × seeds.
 python scripts/make_paper_tables.py
 ```
 
-Generates:
-- `reports/tables/table_h1.md` — KAN vs MLP geometry metrics
-- `reports/tables/table_h2.md` — FN-weighted vs InfoNCE AUROC
-- `reports/tables/table_h3.md` — KAN vs MLP scorer AUROC
-- `reports/tables/table_h4.md` — Edge-aware vs z-only AUROC (novel)
+Reads from `runs/results/` (ephemeral, git-ignored). Generates:
+- `runs/tables/table_h1.md` — KAN vs MLP geometry metrics
+- `runs/tables/table_h2.md` — FN-weighted vs InfoNCE AUROC
+- `runs/tables/table_h3.md` — KAN vs MLP scorer AUROC
+- `runs/tables/table_h4.md` — Edge-aware vs z-only AUROC (novel)
+
+Copy curated tables to `reports/tables/` before committing thesis-ready outputs.
 
 ---
 
@@ -237,17 +239,18 @@ cxr-kan-contrastive/
 │   ├── test_metrics.py                # Linear probe, kNN, AUROC on synthetic
 │   └── test_chexpert.py               # CheXpert loader, uncertainty policy
 │
-├── reports/
-│   ├── figures/
-│   │   └── (UMAP plots, loss curves)
-│   └── tables/
-│       ├── table_h1.md                # KAN vs MLP geometry
-│       ├── table_h2.md                # FN loss improvements
-│       ├── table_h3.md                # KAN vs MLP scorer
-│       ├── table_h4.md                # Edge-aware ablation (novel)
-│       ├── probe_results.csv          # All probe runs (cumulative)
-│       ├── ablation_master.csv        # All ablation cells × seeds
-│       └── geometry.csv               # Geometry metrics
+├── runs/                               # Ephemeral artifacts (git-ignored)
+│   ├── results/                       # Cumulative CSVs from probe/ablate
+│   │   ├── probe_results.csv
+│   │   ├── ablation_master.csv
+│   │   └── geometry.csv
+│   ├── tables/                        # Auto-generated markdown tables
+│   │   └── table_h{1,2,3,4}.md
+│   └── figures/                       # Auto-generated plots
+│
+├── reports/                           # Curated thesis outputs (git-committed)
+│   ├── figures/                       # Hand-selected plots for thesis
+│   └── tables/                        # Final paper tables (copied from runs/tables/)
 │
 ├── .claude/
 │   ├── agents/

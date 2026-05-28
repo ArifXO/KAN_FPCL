@@ -3,10 +3,10 @@
 # H3 comparison: KANPairScorer vs MLPPairScorer at matched param count (R1).
 
 defaults:
-  - _self_
   - /data: chestmnist
   - /model: kan_scorer
   - /loss: fn_weighted_mlp
+  - _self_
 
 hydra:
   searchpath:
