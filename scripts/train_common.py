@@ -104,3 +104,45 @@ def run_validation(
             f"val_max_batches misconfigured (max_batches={max_batches})."
         )
     return total / count
+
+
+def run_validation_dict(
+    val_loader: DataLoader,
+    device: torch.device,
+    forward_fn: Callable[[torch.Tensor, torch.Tensor], dict],
+    max_batches: int | None,
+    val_seed: int,
+    keys: tuple[str, ...],
+) -> dict[str, float]:
+    """Mean of each requested key over (optionally capped) val batches.
+
+    Like :func:`run_validation` but returns a dict so callers can monitor a
+    composite selection score (e.g. ``val_total`` = contrastive loss + collapse
+    penalty) alongside the raw ``loss`` and diagnostics such as
+    ``p_fn_at_cap_fraction``. ``forward_fn(v1, v2)`` must return a dict
+    containing every name in ``keys``. RNG handling matches
+    :func:`run_validation`.
+    """
+    rng_state = torch.get_rng_state()
+    torch.manual_seed(val_seed)
+    sums = {k: 0.0 for k in keys}
+    count = 0
+    try:
+        with torch.no_grad():
+            for (v1, v2), _labels, _pids in val_loader:
+                if max_batches is not None and count >= max_batches:
+                    break
+                out = forward_fn(v1.to(device), v2.to(device))
+                for k in keys:
+                    sums[k] += float(out[k])
+                count += 1
+    finally:
+        torch.set_rng_state(rng_state)
+
+    if count == 0:
+        raise RuntimeError(
+            "Validation produced 0 batches. val split too small for "
+            f"batch_size={val_loader.batch_size} with drop_last=True, or "
+            f"val_max_batches misconfigured (max_batches={max_batches})."
+        )
+    return {k: sums[k] / count for k in keys}

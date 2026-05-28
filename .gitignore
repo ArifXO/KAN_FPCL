@@ -42,14 +42,13 @@ multirun/
 *.pkl
 *.pickle
 
-# All run artifacts (ephemeral — checkpoints, metrics, plots, result CSVs)
-runs/
-!runs/results/.gitkeep
-!runs/tables/.gitkeep
-!runs/figures/.gitkeep
-!runs/figures/loss_curves/.gitkeep
-!runs/figures/umap/.gitkeep
-!runs/figures/geometry/.gitkeep
+# Run artifacts
+_archive_preaudit/
+runs/ablation/**/run_*/
+runs/smoke/
+!runs/smoke/
+runs/smoke/**
+!runs/smoke/.gitkeep
 *.pt
 *.pth
 *.ckpt

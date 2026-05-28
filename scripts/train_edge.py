@@ -45,7 +45,7 @@ from src.utils import make_run_id, save_run_artifacts, set_seed
 from train_common import (
     base_step_metrics,
     build_val_loader,
-    run_validation,
+    run_validation_dict,
     snapshot_cpu_state,
 )
 
@@ -98,8 +98,9 @@ def main(cfg: DictConfig) -> None:
         return head(x), None
 
     def val_forward(v1: torch.Tensor, v2: torch.Tensor) -> dict:
-        # Validation uses raw contrastive loss without p_fn regularization.
-        # p_fn_reg is a training stabilizer, not a metric.
+        # val_total adds the p_fn collapse penalty to the raw contrastive loss
+        # so a saturated scorer (p_fn->1, fn_loss->0) cannot win checkpoint
+        # selection by gaming the FN denominator.
         x = torch.cat([v1, v2], dim=0)
         feats = encoder(x)
         z, edge_feats = forward_batch(feats)
@@ -108,12 +109,19 @@ def main(cfg: DictConfig) -> None:
             edge_feats[:b] if (edge_aware and scorer.use_edge_features) else None
         )
         p_fn = scorer(z[:b], scorer_edge_arg)
-        return loss_fn(z, p_fn, edge_feats if edge_aware else None)
+        out = loss_fn(z, p_fn, edge_feats if edge_aware else None)
+        pfn_reg = lambda_pfn_reg * p_fn.mean()
+        return {
+            "loss": out["loss"],
+            "val_total": out["loss"] + pfn_reg,
+            "p_fn_at_cap_fraction": out["p_fn_at_cap_fraction"],
+        }
 
     losses: list[float] = []
     step_metrics: list[dict] = []
     val_loss_curve: list[dict] = []
     best_val_loss = float("inf")
+    best_val_total = float("inf")
     best_val_step = -1
     best_state: dict | None = None
 
@@ -182,16 +190,33 @@ def main(cfg: DictConfig) -> None:
                 encoder.eval()
                 head.eval()
                 scorer.eval()
-                val_loss = run_validation(val_loader, device, val_forward, val_max_batches, val_seed)
+                val_out = run_validation_dict(
+                    val_loader, device, val_forward, val_max_batches, val_seed,
+                    keys=("loss", "val_total", "p_fn_at_cap_fraction"),
+                )
                 encoder.train()
                 head.train()
                 scorer.train()
-                val_loss_curve.append({"step": step, "val_loss": val_loss})
-                if val_loss < best_val_loss:
+                val_loss = val_out["loss"]
+                val_total = val_out["val_total"]
+                val_loss_curve.append(
+                    {"step": step, "val_loss": val_loss, "val_total": val_total}
+                )
+                if val_total < best_val_total:
+                    best_val_total = val_total
                     best_val_loss = val_loss
                     best_val_step = step
                     best_state = snapshot_cpu_state(full_model)
-                print(f"[val step {step}] val_loss={val_loss:.4f} best={best_val_loss:.4f}")
+                cap_frac = val_out.get("p_fn_at_cap_fraction", 0.0)
+                if cap_frac > 0.5:
+                    print(
+                        f"[WARNING step {step}] p_fn saturation: {cap_frac:.1%} of pairs at "
+                        f"max_fn_weight cap. Scorer may be collapsing."
+                    )
+                print(
+                    f"[val step {step}] val_loss={val_loss:.4f} "
+                    f"val_total={val_total:.4f} best={best_val_total:.4f}"
+                )
 
             step += 1
 
@@ -203,6 +228,7 @@ def main(cfg: DictConfig) -> None:
     if best_state is None:
         best_state = snapshot_cpu_state(full_model)
         best_val_loss = float("nan")
+        best_val_total = float("nan")
 
     metrics = {
         "train_loss_final": losses[-1] if losses else float("nan"),
@@ -210,6 +236,7 @@ def main(cfg: DictConfig) -> None:
         "train_loss_type": "contrastive",
         "val_loss_curve": val_loss_curve,
         "best_val_loss": best_val_loss,
+        "best_val_total": best_val_total,
         "best_val_step": best_val_step,
         "train_time_sec": runtime,
         "steps": step,
