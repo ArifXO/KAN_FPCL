@@ -4,7 +4,7 @@
 
 defaults:
   - /data: chestmnist
-  - /model: kan_scorer
+  - /model: mlp_head_kan_scorer
   - /loss: fn_weighted_mlp
   - _self_
 

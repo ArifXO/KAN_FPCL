@@ -1,2 +1,0 @@
-run_id,encoder,head,loss,scorer,dataset,seed,params_total,macro_auroc_linear,macro_auroc_knn,mAP,runtime_sec
-20260522-002642-ad7ebe,resnet18,mlp,infonce,none,chestmnist,42,11499584,0.655465,0.59197,0.09352,78.55

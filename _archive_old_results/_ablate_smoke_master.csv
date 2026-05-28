@@ -1,2 +1,0 @@
-cell_id,head,loss,scorer,lambda_edge,lambda_edge_align,dataset,seed,params_total,macro_auroc_linear,macro_auroc_knn,mAP,alignment,uniformity,effective_rank,runtime_sec,status
-smoke_mlp_infonce,mlp,infonce,none,0.0,0.0,chestmnist,42,11499584,0.655465,0.59197,0.09352,0.441167,-0.771694,65.643616,138.7,OK

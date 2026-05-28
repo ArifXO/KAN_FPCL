@@ -1,1 +1,0 @@
-cell_id,head,loss,scorer,lambda_edge,lambda_edge_align,dataset,seed,params_total,macro_auroc_linear,macro_auroc_knn,mAP,alignment,uniformity,effective_rank,per_class_auroc_json,runtime_sec,status

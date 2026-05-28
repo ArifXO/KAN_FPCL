@@ -61,3 +61,26 @@ def test_full_configs_compose_and_resolve(config_name):
     # or unresolved reference.
     OmegaConf.to_container(cfg, resolve=True)
     assert cfg.train.max_steps == 0
+
+
+@pytest.mark.parametrize(
+    "config_name",
+    sorted(p.stem for p in EXP_DIR.glob("full_*.yaml")),
+)
+def test_full_configs_have_complete_model_bundle(config_name):
+    # train_fn.py / train_edge.py expect cfg.model.{encoder,head,scorer}. The
+    # InfoNCE pipeline (train.py) has no scorer. A scorer-using config that
+    # references a scorer-only partial bundle (e.g. kan_scorer.yaml) crashes
+    # with `ConfigAttributeError: Key 'encoder' is not in struct`.
+    cfg = _compose(config_name, overrides=["train.max_steps=0"])
+    assert "encoder" in cfg.model, f"{config_name}: cfg.model.encoder missing"
+    assert "head" in cfg.model, f"{config_name}: cfg.model.head missing"
+
+    # A scorer is required iff the loss is not plain InfoNCE (i.e. FN-weighted
+    # or edge-aware), which is what train_fn.py / train_edge.py consume.
+    loss_target = cfg.loss._target_
+    if loss_target != "src.losses.InfoNCELoss":
+        assert "scorer" in cfg.model, (
+            f"{config_name}: loss {loss_target} runs via train_fn/train_edge "
+            f"but cfg.model.scorer is missing"
+        )
