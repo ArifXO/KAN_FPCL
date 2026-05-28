@@ -109,3 +109,17 @@ def test_parameter_count_reasonable_for_default_geometry():
     scorer = MLPPairScorer(input_dim=128, hidden_dim=32, num_layers=2)
     n = scorer.parameter_count()
     assert 5_000 < n < 12_000, f"unexpected param count: {n}"
+
+
+# ---------------------------------------------------------------------------
+# Symmetry
+# ---------------------------------------------------------------------------
+
+
+def test_mlp_scorer_symmetry():
+    scorer = MLPPairScorer(input_dim=32, hidden_dim=16)
+    z = torch.randn(6, 32)
+    p = scorer(z)
+    assert torch.allclose(p, p.T, atol=1e-6), (
+        f"MLPPairScorer is not symmetric: max diff={(p - p.T).abs().max()}"
+    )

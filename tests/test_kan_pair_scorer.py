@@ -64,3 +64,12 @@ def test_interchangeable():
     out = loss_fn(z, p_fn)
     assert "loss" in out, "FNWeightedInfoNCELoss output missing 'loss' key"
     assert torch.isfinite(out["loss"]), f"Loss is not finite: {out['loss']}"
+
+
+def test_kan_scorer_symmetry():
+    scorer = KANPairScorer(input_dim=D)
+    z = torch.randn(6, D)
+    p = scorer(z)
+    assert torch.allclose(p, p.T, atol=1e-6), (
+        f"KANPairScorer is not symmetric: max diff={(p - p.T).abs().max()}"
+    )

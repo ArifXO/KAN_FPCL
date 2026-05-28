@@ -71,6 +71,7 @@ class MLPPairScorer(nn.Module):
         z_j = z_view1.unsqueeze(0).expand(b, b, d)
         pair_feat = torch.cat([z_i, z_j], dim=-1)
         logits = self.mlp(pair_feat).squeeze(-1)
+        logits = 0.5 * (logits + logits.T)  # enforce symmetry: p_fn[i,j] == p_fn[j,i]
         return torch.sigmoid(logits)
 
     def parameter_count(self) -> int:
@@ -146,6 +147,7 @@ class KANPairScorer(nn.Module):
         pair_feat = torch.cat([z_i, z_j], dim=-1).reshape(b * b, 2 * d)
         hidden = self.kan_layer(pair_feat)
         logits = self.out(hidden).reshape(b, b)
+        logits = 0.5 * (logits + logits.T)  # enforce symmetry: p_fn[i,j] == p_fn[j,i]
         return torch.sigmoid(logits)
 
     def parameter_count(self) -> int:
