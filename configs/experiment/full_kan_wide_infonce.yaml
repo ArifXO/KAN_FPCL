@@ -1,0 +1,36 @@
+# configs/experiment/full_kan_wide_infonce.yaml
+# H1 PARAMETER ABLATION: wide FastKAN projector (hidden_dim=128 >= output), plain InfoNCE.
+# NOT R1-matched (head ~737K vs MLP 329K). Used ONLY to separate the KAN
+# architecture effect from the narrow-hidden bottleneck in full_kan_infonce.
+# See configs/model/kan_wide_head.yaml for the param breakdown + R1 deviation note.
+
+defaults:
+  - /data: chestmnist
+  - /model: kan_wide_head
+  - /loss: infonce
+  - _self_
+
+hydra:
+  searchpath:
+    - file://${oc.env:PROJECT_ROOT}/configs
+
+run:
+  name: full_kan_wide_infonce
+  output_root: runs/checkpoints
+  seed: 42
+  deterministic: false
+  device: cuda
+
+train:
+  max_steps: 10000
+  log_every: 100
+  lr: 3.0e-4
+  lr_min: 1.0e-6
+  grad_clip: 1.0
+  val_every: 500
+  val_max_batches: null
+
+data:
+  batch_size: 256
+  num_workers: 4
+  download: false

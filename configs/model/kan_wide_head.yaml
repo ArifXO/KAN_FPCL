@@ -1,0 +1,39 @@
+# configs/model/kan_wide_head.yaml
+# H1 PARAMETER ABLATION (NOT R1-matched — intentional).
+#
+# Purpose: disentangle the "KAN architecture" effect from the "narrow-hidden
+# bottleneck" effect that confounds kan_head.yaml. The R1-matched FastKAN head
+# (kan_head.yaml) is forced to hidden_dim=57, which is BELOW the 128-D output,
+# so the embedding factors through a 57-D space and effective_rank is capped
+# near 57 (observed 45.5). That makes "KAN has lower rank" inseparable from
+# "KAN's hidden layer is narrower than its output".
+#
+# This config sets hidden_dim=128 (>= output_dim) so the head can express a
+# full-rank 128-D embedding. The RBF weight tensor (O x I x C) is param-heavy,
+# so this CANNOT also satisfy R1 parity:
+#   Layer1 512->128: rbf 128*512*8=524,288 + base 512*128+128=65,664 + bw 1 = 589,953
+#   Layer2 128->128: rbf 128*128*8=131,072 + base 128*128+128=16,512 + bw 1 = 147,585
+#   Head total                                                              = 737,538
+#   vs MLP baseline head 329,344  ->  +123.9%  (FAR outside +-15%).
+#
+# R1 DEVIATION (documented per CLAUDE.md Rule 5): this cell is explicitly a
+# "parameter ablation", NOT a parity comparison. It must NEVER be cited as a
+# head-to-head KAN-vs-MLP win/loss — only against kan_infonce (same arch, narrow
+# hidden) to isolate the bottleneck, and as a capacity reference point.
+
+encoder:
+  _target_: src.models.ResNet18Encoder
+  pretrained: false
+
+head:
+  _target_: src.models.kan.FastKANProjector
+  input_dim: 512
+  hidden_dim: 128
+  output_dim: 128
+  num_centers: 8
+  grid_min: -2.0
+  grid_max: 2.0
+  use_base_linear: true
+  base_activation: silu
+  rbf_init_scale: 0.1
+  normalize: true

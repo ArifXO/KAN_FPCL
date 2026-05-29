@@ -167,7 +167,11 @@ def _fmt_metric(values: pd.Series, digits: int = 4) -> str:
     if vals.empty:
         return "NA"
     mean = vals.mean()
-    std = vals.std(ddof=1) if len(vals) > 1 else 0.0
+    # n=1: no variance to report. Tag as (n=1) so the absence of error bars is
+    # explicit rather than printing "± 0.0000", which reads as zero variance.
+    if len(vals) == 1:
+        return f"{mean:.{digits}f} (n=1)"
+    std = vals.std(ddof=1)
     return f"{mean:.{digits}f} ± {std:.{digits}f}"
 
 
@@ -346,7 +350,11 @@ def _build_tables(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
         return sub
 
     # H1: head architecture — InfoNCE rows only, no scorer.
-    h1 = _cell_slice(["mlp_infonce", "kan_infonce", "reskan_infonce"])
+    # kan_wide_infonce is a labeled parameter ablation (hidden>=output, NOT
+    # R1-matched); it appears as an extra context row to disentangle the
+    # narrow-hidden bottleneck from the KAN architecture, and must not be read
+    # as a parity KAN-vs-MLP comparison.
+    h1 = _cell_slice(["mlp_infonce", "kan_infonce", "kan_wide_infonce", "reskan_infonce"])
     if not h1.empty:
         agg = {
             "head": ("head", "first"),
@@ -410,6 +418,14 @@ def _build_tables(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
         ["zonly_fn", "edge_scorer_no_aux", "edge_contrastive", "edge_align"]
     )
     if not h4.empty:
+        # Compute rare-class AUROC from the per-class JSON (as H2 does); the
+        # synthesized rare_disease_auroc column is all-NaN, so aggregating it
+        # directly prints NA even though the data is present.
+        if "per_class_auroc_linear_json" in h4.columns:
+            h4["rare_auroc"] = h4["per_class_auroc_linear_json"].apply(_extract_rare_auroc)
+            rare_src = "rare_auroc"
+        else:
+            rare_src = "rare_disease_auroc"
         tables["table_h4.md"] = (
             h4.groupby("cell_id", observed=True)
             .agg(
@@ -418,7 +434,7 @@ def _build_tables(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
                 lambda_edge_align=("lambda_edge_align", "first"),
                 n_seeds=("seed", "nunique"),
                 macro_auroc=("macro_auroc", _auroc),
-                rare_disease_auroc=("rare_disease_auroc", _auroc),
+                rare_disease_auroc=(rare_src, _auroc),
                 mAP=("mAP", _auroc),
             )
             .reset_index()
@@ -465,7 +481,8 @@ def _print_hypothesis_summary(df: pd.DataFrame) -> None:
                 f"({min(seeds.values())}+ seeds, {n_present}/{len(required_cells)} cells)"
             )
 
-    _gate("H1", "head architecture", ["mlp_infonce", "kan_infonce", "reskan_infonce"])
+    _gate("H1", "head architecture",
+          ["mlp_infonce", "kan_infonce", "kan_wide_infonce", "reskan_infonce"])
     _gate("H2", "FN-weighted loss", ["mlp_infonce", "mlp_fn_mlp"])
     _gate("H3", "KAN scorer", ["mlp_fn_mlp", "mlp_fn_kan"])
     _gate(

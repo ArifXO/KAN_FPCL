@@ -1,0 +1,12 @@
+run_id,encoder,head,loss,seed,alignment,uniformity,effective_rank,per_dim_std_mean,offdiag_covariance,dataset
+mlp_infonce_s42_20260528-163238-604fc3,resnet18,mlp,infonce,42,0.224545,-3.885061,116.922783,0.088178,0.000418,chestmnist
+kan_infonce_s42_20260528-165045-8e5153,resnet18,fastkan,infonce,42,0.207447,-3.768189,45.529732,0.087988,0.000982,chestmnist
+reskan_infonce_s42_20260528-170715-7a57ee,resnet18,residual_fastkan,infonce,42,0.226575,-3.882958,116.297462,0.088174,0.000423,chestmnist
+mlp_fn_mlp_s42_20260528-172345-c191b2,resnet18,mlp,fn_weighted,42,0.2231,-3.874785,113.033424,0.088123,0.000468,chestmnist
+mlp_fn_kan_s42_20260528-174451-5e8acd,resnet18,mlp,fn_weighted,42,0.221619,-3.874969,113.311989,0.088133,0.000468,chestmnist
+kan_fn_kan_s42_20260528-180626-af2327,resnet18,fastkan,fn_weighted,42,0.209468,-3.775478,49.880863,0.087945,0.000942,chestmnist
+edge_scorer_no_aux_s42_20260528-182748-96170b,resnet18,fastkan,edge_aware_fn,42,0.20873,-3.777546,47.904629,0.088055,0.000962,chestmnist
+edge_contrastive_s42_20260528-184912-61fb62,resnet18,fastkan,edge_aware_fn,42,0.236816,-3.8466,103.4188,0.088122,0.000654,chestmnist
+edge_align_s42_20260528-191034-df5969,resnet18,fastkan,edge_aware_fn,42,0.212591,-3.791282,67.788528,0.088072,0.000915,chestmnist
+zonly_fn_s42_20260528-193203-4a5d1d,resnet18,fastkan,edge_aware_fn,42,0.206572,-3.776012,48.409363,0.087987,0.000957,chestmnist
+edge_contrastive_kan_s42_20260528-195356-a03ff4,resnet18,fastkan,edge_aware_fn,42,0.240321,-3.845403,103.253632,0.088103,0.000653,chestmnist

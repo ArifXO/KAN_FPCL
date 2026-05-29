@@ -5,6 +5,7 @@
 # Cell 1 mlp_infonce       -> mlp_baseline.yaml           -> MLPHead                            ✓
 # Cell 2 kan_infonce        -> kan_head.yaml                -> FastKANProjector                   ✓
 # Cell 3 reskan_infonce     -> residual_fastkan_warp        -> ResidualFastKANWarp                ✓
+# Cell 3b kan_wide_infonce  -> kan_wide_head.yaml           -> FastKANProjector (hidden=128, PARAM ABLATION, not R1-matched) ✓
 # Cell 4 mlp_fn_mlp         -> mlp_scorer.yaml              -> MLPHead + MLPPairScorer            ✓
 # Cell 5 mlp_fn_kan         -> kan_scorer.yaml               -> MLPHead + KANPairScorer            ✓
 # Cell 6 kan_fn_kan         -> kan_head_with_kan_scorer     -> FastKANProjector + KANPairScorer   ✓
@@ -79,6 +80,22 @@ ablate:
       train_script: scripts.train
       train_config: full_reskan_infonce
       head: residual_fastkan
+      loss: infonce
+      scorer: none
+      lambda_edge: 0.0
+      lambda_edge_align: 0.0
+      dataset: chestmnist
+      overrides: []
+
+    # Cell 3b — H1 PARAMETER ABLATION: wide FastKAN (hidden=128 >= output), plain InfoNCE.
+    # NOT R1-matched (~737K head vs 329K MLP). Isolates the KAN architecture effect
+    # from the narrow-hidden bottleneck of kan_infonce. Never a head-to-head KAN-vs-MLP
+    # claim — compare only against kan_infonce to disentangle the effective_rank confound.
+    - cell_id: kan_wide_infonce
+      hypothesis: h1
+      train_script: scripts.train
+      train_config: full_kan_wide_infonce
+      head: fastkan_wide
       loss: infonce
       scorer: none
       lambda_edge: 0.0

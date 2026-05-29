@@ -33,7 +33,13 @@ from omegaconf import DictConfig
 _COLUMNS = [
     "cell_id", "head", "loss", "scorer", "lambda_edge", "lambda_edge_align",
     "dataset", "seed", "params_total", "params_scorer", "macro_auroc_linear", "macro_auroc_knn",
-    "mAP", "per_class_auroc_linear_json", "alignment", "uniformity", "effective_rank",
+    "mAP", "per_class_auroc_linear_json",
+    # Test-split metrics: model_best.pt is selected on val, so val numbers are
+    # optimistically biased. Carry the test columns probe.py emits so downstream
+    # tables can report the unbiased headline split.
+    "macro_auroc_linear_test", "macro_auroc_knn_test", "mAP_test",
+    "per_class_auroc_linear_test_json",
+    "alignment", "uniformity", "effective_rank",
     "runtime_sec", "status",
 ]
 
@@ -172,6 +178,10 @@ def _run_cell(
             "macro_auroc_knn": probe_row.get("macro_auroc_knn", ""),
             "mAP": probe_row.get("mAP", ""),
             "per_class_auroc_linear_json": probe_row.get("per_class_auroc_linear_json", ""),
+            "macro_auroc_linear_test": probe_row.get("macro_auroc_linear_test", ""),
+            "macro_auroc_knn_test": probe_row.get("macro_auroc_knn_test", ""),
+            "mAP_test": probe_row.get("mAP_test", ""),
+            "per_class_auroc_linear_test_json": probe_row.get("per_class_auroc_linear_test_json", ""),
             "alignment": geom_row.get("alignment", ""),
             "uniformity": geom_row.get("uniformity", ""),
             "effective_rank": geom_row.get("effective_rank", ""),

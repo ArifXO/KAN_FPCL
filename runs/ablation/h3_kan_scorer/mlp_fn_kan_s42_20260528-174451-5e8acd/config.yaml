@@ -1,0 +1,58 @@
+data:
+  _target_: src.data.ChestMNISTDataset
+  name: chestmnist
+  size: 28
+  batch_size: 256
+  num_workers: 4
+  pin_memory: false
+  download: false
+  split_seed: 42
+  normalize:
+    mean:
+    - 0.5
+    std:
+    - 0.5
+  augmentation:
+    crop_scale_min: 0.6
+    crop_scale_max: 1.0
+    rotation_degrees: 15
+    brightness: 0.3
+    contrast: 0.3
+    horizontal_flip_prob: 0.5
+model:
+  encoder:
+    _target_: src.models.ResNet18Encoder
+    pretrained: false
+  head:
+    _target_: src.models.MLPHead
+    in_dim: 512
+    hidden_dim: 512
+    output_dim: 128
+    use_batch_norm: true
+    l2_normalize: true
+  scorer:
+    _target_: src.models.KANPairScorer
+    input_dim: 128
+    hidden_dim: 5
+    num_centers: 6
+    use_base_linear: true
+loss:
+  _target_: src.losses.FNWeightedInfoNCELoss
+  temperature: 0.1
+  normalize_embeddings: true
+  max_fn_weight: 0.5
+run:
+  name: mlp_fn_kan_s42
+  output_root: runs/ablation/h3_kan_scorer
+  seed: 42
+  deterministic: false
+  device: cuda
+train:
+  max_steps: 10000
+  log_every: 100
+  lr: 0.0003
+  lr_min: 1.0e-06
+  grad_clip: 1.0
+  val_every: 500
+  val_max_batches: null
+  lambda_pfn_reg: 0.01

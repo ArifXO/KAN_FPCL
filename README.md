@@ -320,6 +320,7 @@ On frozen eval embeddings:
 |---|---|---|---|---|---|---|
 | mlp_infonce | MLP | InfoNCE | — | — | — | H1 baseline |
 | kan_infonce | FastKAN | InfoNCE | — | — | — | H1 |
+| kan_wide_infonce | FastKAN (wide, ~737K) | InfoNCE | — | — | — | H1 param ablation (NOT R1-matched) |
 | reskan_infonce | Res-KAN | InfoNCE | — | — | — | H1 |
 | mlp_fn_mlp | MLP | FN-weighted | MLP | — | — | H2 |
 | mlp_fn_kan | MLP | FN-weighted | KAN | — | — | H3 |
@@ -435,5 +436,8 @@ For questions about implementation, rules, or subagent behavior:
 ---
 
 **Last Updated:** May 2026  
-**Current Stage:** 10 (Ablation — configs ready, full runs not yet executed)  
-**Status:** Code-ready for all hypotheses; awaiting `scripts/ablate.py` execution
+**Current Stage:** 10 (Ablation — 1-seed pilot run audited; bug fixes applied, re-run pending)  
+**Status:** Code-ready for all hypotheses. A 1-seed pilot was audited
+(`reports/audit_1seed_ablation.md`) and the resulting fixes are documented in
+[`BugFix.md`](BugFix.md). Next step: re-run the 1-seed ablation with fixes, then
+the full 3-seed sweep.
