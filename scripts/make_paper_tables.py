@@ -3,6 +3,11 @@
 The ablation CSV is expected to come from ``scripts/ablate.py``. Failed rows
 and smoke rows are excluded by default so thesis tables only average completed
 full-run cells.
+
+Headline metrics default to the **test** split: ``model_best.pt`` is selected on
+validation loss, so val AUROC/mAP are optimistically biased. Pass ``--split val``
+to reproduce the (biased) validation numbers. ``--publish`` additionally copies
+the generated tables into ``reports/tables/`` for git commit.
 """
 
 from __future__ import annotations
@@ -11,6 +16,7 @@ import argparse
 import json
 import math
 import os
+import shutil
 from pathlib import Path
 
 import numpy as np
@@ -30,19 +36,30 @@ CORE_COLUMNS = {
     "seed",
     "params_total",
 }
-METRIC_ALIASES = {
-    "macro_auroc": ("macro_auroc_linear", "macro_auroc"),
-    "rare_disease_auroc": (
-        "rare_disease_auroc",
-        "rare_disease_auroc_linear",
-        "rare_auroc",
-        "rare_auroc_linear",
-    ),
-    "mAP": ("mAP", "map", "mean_average_precision"),
-}
 
 # H1/H2/H3/H4: minimum seeds needed to count as "enough data"
 _MIN_SEEDS = 3
+
+
+def _metric_aliases(split: str) -> dict[str, tuple[str, ...]]:
+    """Canonical metric name -> source-column candidates, in preference order.
+
+    For ``split='test'`` the ``*_test`` columns are tried first and fall back to
+    the val columns so a run that pre-dates the test columns still tabulates.
+    """
+    if split == "test":
+        return {
+            "macro_auroc": ("macro_auroc_linear_test", "macro_auroc_linear", "macro_auroc"),
+            "macro_auroc_knn": ("macro_auroc_knn_test", "macro_auroc_knn"),
+            "mAP": ("mAP_test", "mAP", "map"),
+            "rare_disease_auroc": ("rare_disease_auroc", "rare_auroc"),
+        }
+    return {
+        "macro_auroc": ("macro_auroc_linear", "macro_auroc"),
+        "macro_auroc_knn": ("macro_auroc_knn",),
+        "mAP": ("mAP", "map", "mean_average_precision"),
+        "rare_disease_auroc": ("rare_disease_auroc", "rare_disease_auroc_linear", "rare_auroc"),
+    }
 
 
 def _parse_args() -> argparse.Namespace:
@@ -50,6 +67,12 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--input", default="runs/results/ablation_master.csv",
                    help="Ablation CSV path.")
     p.add_argument("--output-dir", default="runs/tables", help="Directory for tables.")
+    p.add_argument("--split", choices=["test", "val"], default="test",
+                   help="Metric split for headline numbers (default: test).")
+    p.add_argument("--publish", action="store_true",
+                   help="Also copy generated tables into reports/tables/ for commit.")
+    p.add_argument("--publish-dir", default="reports/tables",
+                   help="Destination for --publish (default: reports/tables).")
     p.add_argument("--include-smoke", action="store_true", help="Keep smoke_* rows.")
     p.add_argument("--include-failed", action="store_true", help="Keep FAILED rows.")
     return p.parse_args()
@@ -73,8 +96,33 @@ def _read_ablation(path: Path) -> pd.DataFrame:
     return df
 
 
-def _metric_column(df: pd.DataFrame, canonical: str) -> str:
-    for name in METRIC_ALIASES[canonical]:
+def _resolve_split(df: pd.DataFrame, requested: str) -> str:
+    """Return the split actually usable, downgrading test->val with a warning."""
+    if requested == "val":
+        return "val"
+    has_test = (
+        "macro_auroc_linear_test" in df.columns
+        and pd.to_numeric(df["macro_auroc_linear_test"], errors="coerce").notna().any()
+    )
+    if has_test:
+        return "test"
+    print(
+        "[make_paper_tables WARNING] --split test requested but no test metrics "
+        "found in the CSV (pre-dates ablate.py test columns). Falling back to "
+        "VALIDATION metrics - these are optimistically biased."
+    )
+    return "val"
+
+
+def _per_class_col(df: pd.DataFrame, split: str) -> str:
+    """Per-class AUROC JSON column for the chosen split, with val fallback."""
+    if split == "test" and "per_class_auroc_linear_test_json" in df.columns:
+        return "per_class_auroc_linear_test_json"
+    return "per_class_auroc_linear_json"
+
+
+def _metric_column(df: pd.DataFrame, canonical: str, aliases: dict[str, tuple[str, ...]]) -> str:
+    for name in aliases[canonical]:
         if name in df.columns:
             df[canonical] = pd.to_numeric(df[name], errors="coerce")
             return canonical
@@ -82,7 +130,12 @@ def _metric_column(df: pd.DataFrame, canonical: str) -> str:
     return canonical
 
 
-def _prepare(df: pd.DataFrame, include_smoke: bool, include_failed: bool) -> pd.DataFrame:
+def _prepare(
+    df: pd.DataFrame,
+    include_smoke: bool,
+    include_failed: bool,
+    aliases: dict[str, tuple[str, ...]],
+) -> pd.DataFrame:
     out = df.copy()
     if "status" in out.columns and not include_failed:
         out = out[out["status"].fillna("OK").eq("OK")]
@@ -108,58 +161,9 @@ def _prepare(df: pd.DataFrame, include_smoke: bool, include_failed: bool) -> pd.
         if col not in out.columns:
             out[col] = 0.0 if col.startswith("lambda_") else math.nan
         out[col] = pd.to_numeric(out[col], errors="coerce")
-    for metric in METRIC_ALIASES:
-        _metric_column(out, metric)
+    for metric in aliases:
+        _metric_column(out, metric, aliases)
     return out.reset_index(drop=True)
-
-
-def _norm(value: object) -> str:
-    return str(value).strip().lower().replace("-", "_")
-
-
-def _head_family(value: object) -> str:
-    head = _norm(value)
-    if "res" in head and "kan" in head:
-        return "res_KAN"
-    if "kan" in head:
-        return "KAN"
-    if "mlp" in head:
-        return "MLP"
-    return str(value)
-
-
-def _loss_family(value: object) -> str | None:
-    loss = _norm(value)
-    if loss in {"infonce", "info_nce"}:
-        return "InfoNCE"
-    if "fn" in loss:
-        return "FN-weighted"
-    return None
-
-
-def _scorer_family(value: object) -> str | None:
-    scorer = _norm(value)
-    if "edge" in scorer:
-        return None
-    if "kan" in scorer:
-        return "FN+KAN_scorer"
-    if "mlp" in scorer:
-        return "FN+MLP_scorer"
-    return None
-
-
-def _edge_mode(row: pd.Series) -> str:
-    lam = row.get("lambda_edge", 0.0)
-    align = row.get("lambda_edge_align", 0.0)
-    lam = 0.0 if pd.isna(lam) else float(lam)
-    align = 0.0 if pd.isna(align) else float(align)
-    if lam == 0.0 and align == 0.0:
-        return "z-only"
-    if lam > 0.0 and align > 0.0:
-        return "edge-aware + edge-align"
-    if lam > 0.0:
-        return "edge-aware"
-    return "edge-align"
 
 
 def _fmt_metric(values: pd.Series, digits: int = 4) -> str:
@@ -188,103 +192,6 @@ def _seed_count(values: pd.Series) -> int:
     return int(values.dropna().nunique())
 
 
-def _edge_off(df: pd.DataFrame) -> pd.Series:
-    return df["lambda_edge"].fillna(0).eq(0) & df["lambda_edge_align"].fillna(0).eq(0)
-
-
-def _parse_per_class_auroc(cell_df: pd.DataFrame) -> dict[str, list[float]]:
-    """Parse per_class_auroc_linear_json across seeds into {class_name: [auroc, ...]}."""
-    col = "per_class_auroc_linear_json"
-    if col not in cell_df.columns:
-        return {}
-    per_class: dict[str, list[float]] = {}
-    for raw in cell_df[col].dropna():
-        try:
-            parsed = json.loads(raw) if isinstance(raw, str) else raw
-        except (json.JSONDecodeError, TypeError):
-            continue
-        if not isinstance(parsed, dict):
-            continue
-        for cls, val in parsed.items():
-            try:
-                per_class.setdefault(cls.lower(), []).append(float(val))
-            except (TypeError, ValueError):
-                continue
-    return per_class
-
-
-def _summarize(
-    df: pd.DataFrame,
-    group_cols: list[str],
-    metrics: list[str],
-    label_order: dict[str, list[str]] | None = None,
-) -> pd.DataFrame:
-    if df.empty:
-        columns = [*group_cols, "params_total", "n_seeds", *metrics]
-        return pd.DataFrame(columns=columns)
-
-    rows: list[dict[str, object]] = []
-    for keys, group in df.groupby(group_cols, dropna=False, sort=False):
-        if not isinstance(keys, tuple):
-            keys = (keys,)
-        row = {col: value for col, value in zip(group_cols, keys)}
-        row["params_total"] = _fmt_params(group["params_total"])
-        row["n_seeds"] = _seed_count(group["seed"])
-        for metric in metrics:
-            row[metric] = _fmt_metric(group[metric])
-        rows.append(row)
-    out = pd.DataFrame(rows)
-    if label_order:
-        order_cols = []
-        for col, order in label_order.items():
-            if col in out.columns:
-                order_col = f"__order_{col}"
-                ranks = {label: idx for idx, label in enumerate(order)}
-                out[order_col] = out[col].map(ranks).fillna(len(order))
-                order_cols.append(order_col)
-        if order_cols:
-            out = out.sort_values(order_cols, na_position="last").drop(columns=order_cols)
-    return out.reset_index(drop=True)
-
-
-def _summarize_h2_with_rare(df: pd.DataFrame) -> pd.DataFrame:
-    """Build H2 table: macro_auroc + rare_disease_auroc + 3 rarest per-class columns."""
-    h2 = df[_edge_off(df)].copy()
-    h2["loss_family"] = h2["loss"].map(_loss_family)
-    h2 = h2[h2["loss_family"].notna()]
-
-    rows: list[dict[str, object]] = []
-    for loss_fam, group in h2.groupby("loss_family", sort=False):
-        row: dict[str, object] = {
-            "loss_family": loss_fam,
-            "params_total": _fmt_params(group["params_total"]),
-            "n_seeds": _seed_count(group["seed"]),
-            "macro_auroc": _fmt_metric(group["macro_auroc"]),
-            "rare_disease_auroc": _fmt_metric(group["rare_disease_auroc"]),
-            "mAP": _fmt_metric(group["mAP"]),
-        }
-        # Rare per-class AUROC from JSON column
-        per_class = _parse_per_class_auroc(group)
-        for cls in RARE_CLASSES:
-            vals = per_class.get(cls, [])
-            col_name = f"auroc_{cls}"
-            if vals:
-                s = pd.Series(vals)
-                mean = s.mean()
-                std = s.std(ddof=1) if len(vals) > 1 else 0.0
-                row[col_name] = f"{mean:.4f} ± {std:.4f}"
-            else:
-                row[col_name] = "NA"
-        rows.append(row)
-
-    out = pd.DataFrame(rows)
-    # Sort InfoNCE before FN-weighted
-    order = {"InfoNCE": 0, "FN-weighted": 1}
-    out["__ord"] = out["loss_family"].map(order).fillna(2)
-    out = out.sort_values("__ord").drop(columns="__ord").reset_index(drop=True)
-    return out
-
-
 def _markdown(df: pd.DataFrame) -> str:
     try:
         return df.to_markdown(index=False)
@@ -311,18 +218,18 @@ def _write_table(path: Path, title: str, table: pd.DataFrame) -> None:
 
 
 def _extract_rare_auroc(json_str: str) -> float:
-    """Mean AUROC across rare classes from per_class_auroc_linear_json."""
+    """Mean AUROC across rare classes from a per-class AUROC JSON string."""
     if not json_str or pd.isna(json_str):
         return float("nan")
     try:
         data = json.loads(json_str)
-        vals = [data[c] for c in RARE_CLASSES if c in data]
+        vals = [float(data[c]) for c in RARE_CLASSES if c in data]
         return float(np.mean(vals)) if vals else float("nan")
-    except (json.JSONDecodeError, KeyError):
+    except (json.JSONDecodeError, KeyError, TypeError, ValueError):
         return float("nan")
 
 
-def _build_tables(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
+def _build_tables(df: pd.DataFrame, per_class_col: str) -> dict[str, pd.DataFrame]:
     # Each hypothesis isolates EXACTLY ONE experimental factor:
     # H1: head architecture     (fixed: InfoNCE loss, no scorer)
     # H2: loss function         (fixed: MLP head)
@@ -349,6 +256,12 @@ def _build_tables(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
             )
         return sub
 
+    def _rare_source(sub: pd.DataFrame) -> str:
+        if per_class_col in sub.columns:
+            sub["rare_auroc"] = sub[per_class_col].apply(_extract_rare_auroc)
+            return "rare_auroc"
+        return "rare_disease_auroc"
+
     # H1: head architecture — InfoNCE rows only, no scorer.
     # kan_wide_infonce is a labeled parameter ablation (hidden>=output, NOT
     # R1-matched); it appears as an extra context row to disentangle the
@@ -374,11 +287,7 @@ def _build_tables(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
     # H2: loss function — MLP head rows only (InfoNCE vs FN-weighted).
     h2 = _cell_slice(["mlp_infonce", "mlp_fn_mlp"])
     if not h2.empty:
-        if "per_class_auroc_linear_json" in h2.columns:
-            h2["rare_auroc"] = h2["per_class_auroc_linear_json"].apply(_extract_rare_auroc)
-            rare_src = "rare_auroc"
-        else:
-            rare_src = "rare_disease_auroc"
+        rare_src = _rare_source(h2)
         tables["table_h2.md"] = (
             h2.groupby("cell_id", observed=True)
             .agg(
@@ -418,14 +327,7 @@ def _build_tables(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
         ["zonly_fn", "edge_scorer_no_aux", "edge_contrastive", "edge_align"]
     )
     if not h4.empty:
-        # Compute rare-class AUROC from the per-class JSON (as H2 does); the
-        # synthesized rare_disease_auroc column is all-NaN, so aggregating it
-        # directly prints NA even though the data is present.
-        if "per_class_auroc_linear_json" in h4.columns:
-            h4["rare_auroc"] = h4["per_class_auroc_linear_json"].apply(_extract_rare_auroc)
-            rare_src = "rare_auroc"
-        else:
-            rare_src = "rare_disease_auroc"
+        rare_src = _rare_source(h4)
         tables["table_h4.md"] = (
             h4.groupby("cell_id", observed=True)
             .agg(
@@ -492,6 +394,13 @@ def _print_hypothesis_summary(df: pd.DataFrame) -> None:
     print("----------------------------------------------------------------------\n")
 
 
+def _publish(out_dir: Path, written: list[str], publish_dir: Path) -> None:
+    publish_dir.mkdir(parents=True, exist_ok=True)
+    for filename in written:
+        shutil.copy2(out_dir / filename, publish_dir / filename)
+        print(f"[tables] published {filename} -> {publish_dir}")
+
+
 def main() -> None:
     args = _parse_args()
     in_path = Path(args.input)
@@ -502,17 +411,27 @@ def main() -> None:
         out_dir = PROJECT_ROOT / out_dir
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    df = _prepare(_read_ablation(in_path), args.include_smoke, args.include_failed)
-    tables = _build_tables(df)
+    raw = _read_ablation(in_path)
+    split = _resolve_split(raw, args.split)
+    df = _prepare(raw, args.include_smoke, args.include_failed, _metric_aliases(split))
+    per_class_col = _per_class_col(df, split)
+    tables = _build_tables(df, per_class_col)
+    split_tag = "test split" if split == "test" else "VAL split (biased)"
     titles = {
-        "table_h1.md": "H1 Geometry: MLP vs KAN vs res_KAN",
-        "table_h2.md": "H2 InfoNCE vs FN-weighted (with rare-class AUROC)",
-        "table_h3.md": "H3 FN Scorer Comparison",
-        "table_h4.md": "H4 Edge-aware Scorer Ablation",
+        "table_h1.md": f"H1 Geometry: MLP vs KAN vs res_KAN ({split_tag})",
+        "table_h2.md": f"H2 InfoNCE vs FN-weighted, with rare-class AUROC ({split_tag})",
+        "table_h3.md": f"H3 FN Scorer Comparison ({split_tag})",
+        "table_h4.md": f"H4 Edge-aware Scorer Ablation ({split_tag})",
     }
     for filename, table in tables.items():
         _write_table(out_dir / filename, titles[filename], table)
-    print(f"[tables] wrote {len(tables)} tables to {out_dir}")
+    print(f"[tables] wrote {len(tables)} tables to {out_dir} (metrics: {split} split)")
+
+    if args.publish:
+        publish_dir = Path(args.publish_dir)
+        if not publish_dir.is_absolute():
+            publish_dir = PROJECT_ROOT / publish_dir
+        _publish(out_dir, list(tables.keys()), publish_dir)
 
     _print_hypothesis_summary(df)
 

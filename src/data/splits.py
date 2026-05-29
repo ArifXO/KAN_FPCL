@@ -38,7 +38,7 @@ def patient_level_split(
     patient_ids: list[str],
     ratios: tuple[float, float, float] = (0.7, 0.15, 0.15),
     seed: int = 42,
-) -> tuple[list[str], list[str], list[str]]:
+) -> tuple[list[int], list[int], list[int]]:
     """Split sample indices into disjoint train/val/test by patient ID.
 
     Args:
@@ -77,8 +77,8 @@ def patient_level_split(
     # R5: verify disjointness before returning
     _assert_disjoint(train_patients, val_patients, test_patients)
 
-    def collect(patients: set[str]) -> list[str]:
-        idxs: list[str] = []
+    def collect(patients: set[str]) -> list[int]:
+        idxs: list[int] = []
         for pid in patients:
             idxs.extend(patient_to_indices[pid])
         return idxs

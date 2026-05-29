@@ -27,7 +27,7 @@ from torch.utils.data import DataLoader
 
 from src.data import get_dataset, build_eval_transform
 from src.metrics import linear_probe, knn_eval
-from src.utils import make_run_id, set_seed
+from src.utils import set_seed
 from src.utils.param_count import count_parameters
 
 
@@ -77,6 +77,7 @@ def _extract_embeddings(
 
 
 def _append_csv_row(csv_path: Path, row: dict) -> None:
+    csv_path.parent.mkdir(parents=True, exist_ok=True)
     write_header = not csv_path.exists()
     with open(csv_path, "a", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=_CSV_COLUMNS)
@@ -214,6 +215,20 @@ def main(cfg: DictConfig) -> None:
             f"(class ids: {dropped_no_train_test})."
         )
 
+    # R9: a probe with zero evaluable classes cannot produce AUROC/mAP — fail
+    # loudly here rather than letting sklearn raise an opaque downstream error.
+    # Tiny smoke subsets or pathological splits are the usual cause.
+    for split_name, valid, total in [
+        ("val", valid_classes, val_lbl.shape[1]),
+        ("test", valid_classes_test, test_lbl.shape[1]),
+    ]:
+        if not valid:
+            raise ValueError(
+                f"[probe] No evaluable {split_name} classes (0/{total}). Every "
+                f"class has 0 positives, 0 negatives, or 0 train positives. "
+                f"Split too small or degenerate — cannot compute AUROC/mAP."
+            )
+
     for lbl_arr, name in [(train_lbl, "train"), (val_lbl, "val"), (test_lbl, "test")]:
         if np.any((lbl_arr > 0) & (lbl_arr < 1)):
             raise ValueError(
@@ -249,7 +264,9 @@ def main(cfg: DictConfig) -> None:
     )
 
     runtime = time.time() - t0
-    run_id = make_run_id()
+    # Trace the probe row to its checkpoint directory (matches analyze_geometry,
+    # which also uses ckpt_dir.name) so a (checkpoint, seed) result is locatable.
+    run_id = ckpt_dir.name
 
     names = (
         CHESTMNIST_CLASS_NAMES

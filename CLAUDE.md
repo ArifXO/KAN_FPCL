@@ -2,6 +2,26 @@
 
 This document defines 10 inviolable scientific rules and agent configuration for Claude Code work on the KAN-FPCL thesis. Every module, loss, and dataset handler must comply.
 
+## Cross-Agent Bug Communication
+
+Two agents review this codebase — **Codex** and **Claude Code** — and they
+communicate through a fixed pair of files at the project root:
+
+- **`BUG_codex.md`** — Codex's channel. Codex writes its code reviews and bug
+  findings here (severity-ranked, with evidence and reproduction steps).
+- **`BUG_claude_code.md`** — Claude Code's channel. Claude Code reads
+  `BUG_codex.md`, then records here, per issue, **what was broken** and **what
+  was fixed** (or why it was deliberately deferred, with rationale).
+
+Rules for using the channel:
+- When asked to "review", "fix the bugs", or "check the other agent's review",
+  read **both** files first — they are the shared state.
+- Do **not** create new ad-hoc `*.md` bug/fix files. Append to the correct
+  channel file instead. Keep newest entries at the bottom under a dated heading.
+- Cite the source review in each reply entry (e.g. "Source: `BUG_codex.md`").
+- Deferrals must state the reason (e.g. out of CLAUDE.md scope, would regress a
+  working pipeline) so the other agent does not re-raise them.
+
 ## Coding rules
 Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
 

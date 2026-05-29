@@ -60,8 +60,14 @@ def _process_one(src_path: Path, dst_path: Path, size: int, quality: int) -> str
             with Image.open(dst_path) as im:
                 if im.size == (size, size):
                     return "skipped"
-        except Exception:
-            pass
+        except (OSError, Image.DecompressionBombError) as exc:
+            # Existing dst is unreadable/partial — re-encode it below rather
+            # than skip, but surface why (R9: no silent failure).
+            print(
+                f"[preprocess] re-encoding unreadable destination "
+                f"{dst_path}: {type(exc).__name__}: {exc}",
+                flush=True,
+            )
     dst_path.parent.mkdir(parents=True, exist_ok=True)
     tmp_path = dst_path.with_suffix(dst_path.suffix + ".tmp")
     with Image.open(src_path) as im:

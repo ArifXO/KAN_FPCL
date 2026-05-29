@@ -439,5 +439,6 @@ For questions about implementation, rules, or subagent behavior:
 **Current Stage:** 10 (Ablation — 1-seed pilot run audited; bug fixes applied, re-run pending)  
 **Status:** Code-ready for all hypotheses. A 1-seed pilot was audited
 (`reports/audit_1seed_ablation.md`) and the resulting fixes are documented in
-[`BugFix.md`](BugFix.md). Next step: re-run the 1-seed ablation with fixes, then
-the full 3-seed sweep.
+[`BUG_claude_code.md`](BUG_claude_code.md) (Claude Code's fix log; Codex's
+reviews live in [`BUG_codex.md`](BUG_codex.md)). Next step: re-run the 1-seed
+ablation with fixes, then the full 3-seed sweep.

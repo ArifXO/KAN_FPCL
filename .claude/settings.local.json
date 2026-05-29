@@ -89,7 +89,15 @@
       "Bash(mkdir -p runs/smoke runs/ablation/h1_architecture runs/ablation/h2_fn_weighted runs/ablation/h3_kan_scorer runs/ablation/h4_edge_signal)",
       "Bash(touch __TRACKED_VAR__/.gitkeep)",
       "Bash(awk -F',' '{print $1\",\"$10\",\"$15}' runs/results/_ablate_1seed_probe.csv)",
-      "Bash(awk *)"
+      "Bash(awk *)",
+      "Bash(git check-ignore *)",
+      "Bash(git rm *)",
+      "Bash(echo \"exit=$?\")",
+      "Bash(./.venv/Scripts/python.exe scripts/make_paper_tables.py --input runs/results/ablation_1seed_master.csv)",
+      "Bash(./.venv/Scripts/python.exe -m compileall -q scripts/make_paper_tables.py scripts/probe.py scripts/train_common.py scripts/preprocess_chexpert.py src/data/splits.py src/data/__init__.py)",
+      "Bash(./.venv/Scripts/python.exe scripts/make_paper_tables.py --input runs/results/ablation_1seed_master.csv --publish)",
+      "Bash(./.venv/Scripts/python.exe -m pytest -q --no-cov)",
+      "Bash(./.venv/Scripts/python.exe -c 'from omegaconf import OmegaConf; from src.data import get_dataset; cfg=OmegaConf.load\\('\\\\''configs/data/chexpert.yaml'\\\\''\\) *)"
     ]
   }
 }

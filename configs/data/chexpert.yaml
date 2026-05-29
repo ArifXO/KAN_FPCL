@@ -14,6 +14,12 @@
 # `val`; a `test` carve-out is built at runtime from disjoint train
 # patients using patient_level_split.
 
+# Dataset key consumed by src.data.get_dataset(). Present so the factory
+# returns the descriptive "CheXpert is not yet integrated" error (R9) rather
+# than a cryptic "Missing key name" — CheXpert remains loader-only until
+# Stage 9 wires it into get_dataset()/train/probe/geometry.
+name: chexpert
+
 _target_: src.data.CheXpertDataset
 
 # Filesystem root — override per machine. ENV expansion is intentional so

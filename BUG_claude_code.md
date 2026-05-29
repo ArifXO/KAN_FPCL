@@ -1,10 +1,13 @@
-# BugFix.md — 1-Seed Ablation Audit Remediation
+# BUG_claude_code.md — Claude Code's Fix Log & Review Replies
 
-Source audit: `reports/audit_1seed_ablation.md` (experiment-auditor, seed 42, 2026-05-28).
-Fixes applied: 2026-05-29. Scope: ChestMNIST only (CLAUDE.md §Dataset Scope).
+This is Claude Code's half of the cross-agent bug channel (see CLAUDE.md
+§Cross-Agent Bug Communication). Codex writes findings in `BUG_codex.md`;
+Claude Code records here, per issue, **what was broken** and **what was fixed**
+(or why it was deliberately deferred).
 
-This file records, per bug, **what was broken** and **what was fixed**. A fresh
-review pass after the fixes is appended in the last section.
+First entry below: `reports/audit_1seed_ablation.md` (experiment-auditor,
+seed 42, 2026-05-28). Fixes applied 2026-05-29. Scope: ChestMNIST only
+(CLAUDE.md §Dataset Scope).
 
 ---
 
@@ -137,4 +140,58 @@ five fixes verified correct; no new problems introduced; both audit must-fix ite
 
 **Pre-existing, unrelated:** `tests/test_smoke.py::test_required_directories_exist`
 fails because the git-ignored ephemeral dir `runs/figures` is absent in this
-checkout. Not caused by these fixes.
+checkout. Not caused by these fixes. *(Now resolved — see Codex round below.)*
+
+---
+
+# Codex Review Remediation (round 2)
+
+Source: `BUG_codex.md` (Codex, 2026-05-29), 14 ranked issues across `src/`,
+`scripts/`, `configs/`, `tests/`. Fixes applied 2026-05-29. Scope still
+ChestMNIST-only (CLAUDE.md §Dataset Scope) — CheXpert remains deferred.
+
+## Fixed
+
+| # | Sev | What was broken | What was fixed |
+|---|-----|-----------------|----------------|
+| 1 | HIGH | `runs/figures` absent in clean checkout → `test_required_directories_exist` red (218 passed, 1 failed). | Added `runs/figures/.gitkeep` (not git-ignored — verified). **pytest now 219 passed, 0 failed.** |
+| 2 | HIGH | `configs/data/chexpert.yaml` had no `name` key, so the factory died with a cryptic `Missing key name` instead of the intended deferral message. | Added `name: chexpert`. `get_dataset()` now raises the descriptive R9 error "CheXpert is not yet integrated — see CLAUDE.md Dataset Scope." CheXpert stays deferred. |
+| 4 | HIGH | `make_paper_tables.py` reported **validation** metrics as headline, but `model_best.pt` is val-selected (optimistic bias). | Tables now default to `--split test` (`macro_auroc_linear_test`, `macro_auroc_knn_test`, `mAP_test`, `per_class_auroc_linear_test_json`). Falls back to val with a loud warning if the CSV predates the test columns; titles are tagged with the split used. `--split val` reproduces the old numbers. |
+| 5 | MED | `probe.py` minted a fresh `make_run_id()`, so a probe row was not traceable to its checkpoint dir (geometry already used `ckpt_dir.name`). | `run_id = ckpt_dir.name` — probe and geometry rows now share the checkpoint-derived id. Removed the orphaned `make_run_id` import. |
+| 7 | MED | `build_val_loader()` built the contrastive transform with hard defaults, ignoring `cfg.data.augmentation` (which `get_dataloader()` honors) — Hydra aug overrides hit train only. | `build_val_loader()` now threads `cfg.data.augmentation` into `build_contrastive_transform`, matching training (R6). |
+| 8 | MED | `preprocess_chexpert.py` had `except Exception: pass` when reading an existing destination image (R9 violation). | Catches `(OSError, Image.DecompressionBombError)`, logs the path + reason, then re-encodes. No silent failure. |
+| 9 | MED | `probe.py` had no guard for zero evaluable classes → opaque downstream sklearn error on tiny/degenerate splits. | Raises a descriptive `ValueError` (split name, `0/N` count, likely cause) before probing, for both val and test (R9). |
+| 10 | MED | `probe.py` `_append_csv_row` opened the CSV without creating parents → failed for a new nested `output_csv`. | Added `csv_path.parent.mkdir(parents=True, exist_ok=True)`, matching `analyze_geometry.py`. |
+| 11 | LOW | `patient_level_split()` annotated `tuple[list[str], ...]` but returns integer indices. | Corrected to `tuple[list[int], list[int], list[int]]` and the inner `collect()` to `list[int]`. |
+| 13 | LOW | `_extract_rare_auroc` caught only `JSONDecodeError`/`KeyError`; a non-numeric class value could crash table generation. | Now `float(...)`-converts inside the guard and catches `(JSONDecodeError, KeyError, TypeError, ValueError)` → `NaN`. |
+| 12 | LOW | Stale/legacy code in `make_paper_tables.py` + a one-line `publish_tables.py`. | **Refactor (per request):** deleted dead `_summarize`, `_summarize_h2_with_rare`, `_head_family`, `_loss_family`, `_scorer_family`, `_edge_mode`, `_edge_off`, `_parse_per_class_auroc`, `_norm` (the live path is `_build_tables`/`_cell_slice`). Dropped `publish_tables.py`; folded its copy-to-`reports/tables` behavior into `make_paper_tables.py --publish [--publish-dir]`. |
+
+## Deliberately not fixed (out of scope / would regress)
+
+- **#3 CheXpert runtime test split not implemented.** CLAUDE.md defers CheXpert
+  to Stage 9; building the patient-level carve-out now would violate Dataset
+  Scope. CheXpert stays loader-only. Deferred to Stage 9.
+- **#6 Probe metadata defaulting from `ckpt_cfg`.** `ablate.py` already passes
+  `meta.*` explicitly for every cell; re-sourcing defaults from the checkpoint
+  config risks breaking intentional cross-evaluation and the working pipeline.
+  Left as-is; revisit when Stage 9 adds cross-dataset probing.
+- **#12 (broader) `probe.py`/`train_edge.py` > 200 lines.** R10 targets `src/`,
+  not `scripts/`. Only the two table scripts were refactored, per the request.
+- **#14 Doc consistency on CheXpert.** Partially addressed via the new
+  `chexpert.yaml` header note ("loader-only until Stage 9"). A full docs pass is
+  deferred with the rest of CheXpert.
+
+## Re-review after fixes
+
+- `pytest -q --no-cov` → **219 passed, 0 failed** (the previously-failing
+  directory test is green).
+- `compileall` clean on all six edited files.
+- `make_paper_tables.py` regenerated all four tables on the 1-seed CSV: the
+  no-test-column fallback fired with its warning, `(n=1)` tags present, H1 gate
+  still flags `kan_wide_infonce` as not-yet-run; `--publish` copied all four
+  tables to `reports/tables/`.
+- CheXpert factory now returns the descriptive deferral `ValueError` (verified
+  with Codex's reproduction command).
+
+**No new problems found in this round.** Remaining open items are the four
+deliberately-deferred entries above, all gated on Stage 9 / multi-seed runs.
