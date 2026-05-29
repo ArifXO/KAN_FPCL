@@ -48,6 +48,12 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Optional row limit (debug / dry-run).",
     )
+    p.add_argument(
+        "--allow-missing",
+        action="store_true",
+        help="Exit 0 even if some manifest paths have no source file "
+        "(default: exit non-zero so batch jobs do not treat a partial cache as valid).",
+    )
     return p
 
 
@@ -124,6 +130,12 @@ def main(argv: list[str] | None = None) -> int:
             f"WARNING: {counts['missing']} manifest paths had no source file. "
             "Investigate before training (R9 — no silent gaps)."
         )
+        if not args.allow_missing:
+            print(
+                "Exiting non-zero because of missing source images. "
+                "Pass --allow-missing for an intentionally partial debug run."
+            )
+            return 1
     return 0
 
 

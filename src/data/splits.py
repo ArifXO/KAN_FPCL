@@ -78,9 +78,14 @@ def patient_level_split(
     _assert_disjoint(train_patients, val_patients, test_patients)
 
     def collect(patients: set[str]) -> list[int]:
+        # Iterate the seeded, shuffled patient list (not the set) so the
+        # returned index order is reproducible across processes — set iteration
+        # over string keys is hash-randomized and PYTHONHASHSEED cannot be set
+        # for an already-running interpreter.
         idxs: list[int] = []
-        for pid in patients:
-            idxs.extend(patient_to_indices[pid])
+        for pid in unique_patients:
+            if pid in patients:
+                idxs.extend(patient_to_indices[pid])
         return idxs
 
     return collect(train_patients), collect(val_patients), collect(test_patients)

@@ -42,7 +42,9 @@ _CSV_COLUMNS = [
 ]
 
 
-def _load_model(ckpt_dir: Path, device: torch.device) -> tuple[nn.Module, nn.Module]:
+def _load_model(
+    ckpt_dir: Path, device: torch.device, cfg: DictConfig
+) -> tuple[nn.Module, nn.Module]:
     cfg_path = ckpt_dir / "config.yaml"
     if not ckpt_dir.exists():
         raise ValueError(f"checkpoint_dir does not exist: {ckpt_dir}.")
@@ -56,6 +58,20 @@ def _load_model(ckpt_dir: Path, device: torch.device) -> tuple[nn.Module, nn.Mod
         raise ValueError(f"No model checkpoint in {ckpt_dir}.")
 
     ckpt_cfg = OmegaConf.load(cfg_path)
+
+    # R9: geometry reads cfg.data, so a mismatched data config would compute
+    # metrics on the wrong dataset/resolution and mis-record the row.
+    ckpt_data = ckpt_cfg.get("data", {})
+    for field in ("name", "size"):
+        ckpt_val = ckpt_data.get(field)
+        cur_val = cfg.data.get(field)
+        if ckpt_val is not None and cur_val is not None and ckpt_val != cur_val:
+            raise ValueError(
+                f"[geometry] data.{field} mismatch: checkpoint was trained with "
+                f"{field}={ckpt_val!r} but cfg.data.{field}={cur_val!r}. "
+                f"Set cfg.data.{field}={ckpt_val!r} or point at the matching data config."
+            )
+
     encoder = instantiate(ckpt_cfg.model.encoder).to(device)
     head = instantiate(ckpt_cfg.model.head).to(device)
     state = torch.load(load_path, map_location=device)
@@ -86,8 +102,23 @@ def _single_loader(cfg: DictConfig, split: str) -> DataLoader:
 def _pair_loader(cfg: DictConfig, split: str) -> DataLoader:
     mean = list(cfg.data.normalize.mean)
     std = list(cfg.data.normalize.std)
+    # Mirror get_dataloader()/build_val_loader(): honor the Hydra-configured
+    # augmentation so alignment is measured under the experiment's actual
+    # augmentation strength, not library defaults (R6).
+    aug = cfg.data.get("augmentation", {})
     transform = TwoViewTransform(
-        build_contrastive_transform(size=cfg.data.size, mean=mean, std=std)
+        build_contrastive_transform(
+            size=cfg.data.size,
+            mean=mean,
+            std=std,
+            crop_scale=(aug.get("crop_scale_min", 0.6), aug.get("crop_scale_max", 1.0)),
+            rotation=aug.get("rotation_degrees", 15),
+            brightness=aug.get("brightness", 0.3),
+            contrast=aug.get("contrast", 0.3),
+            saturation=aug.get("saturation", 0.0),
+            hue=aug.get("hue", 0.0),
+            flip_prob=aug.get("horizontal_flip_prob", 0.5),
+        )
     )
     dataset = get_dataset(cfg.data, split, transform)
     return DataLoader(
@@ -167,12 +198,21 @@ def _extract_alignment(
 
 def _append_csv_row(csv_path: Path, row: dict) -> None:
     csv_path.parent.mkdir(parents=True, exist_ok=True)
-    write_header = not csv_path.exists()
-    with open(csv_path, "a", newline="") as f:
+    # Replace any prior row sharing the (run_id, seed, dataset) identity so a
+    # re-run overwrites rather than duplicating the geometry row.
+    key = (str(row["run_id"]), str(row["seed"]), str(row["dataset"]))
+    kept: list[dict] = []
+    if csv_path.exists():
+        with open(csv_path, "r", newline="") as f:
+            for r in csv.DictReader(f):
+                r_key = (str(r.get("run_id")), str(r.get("seed")), str(r.get("dataset")))
+                if r_key != key:
+                    kept.append({k: r.get(k, "") for k in _CSV_COLUMNS})
+    kept.append({k: row.get(k, "") for k in _CSV_COLUMNS})
+    with open(csv_path, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=_CSV_COLUMNS)
-        if write_header:
-            writer.writeheader()
-        writer.writerow(row)
+        writer.writeheader()
+        writer.writerows(kept)
 
 
 @hydra.main(version_base=None, config_path="../../configs/experiment", config_name="geometry")
@@ -186,7 +226,7 @@ def main(cfg: DictConfig) -> None:
     set_seed(cfg.geometry.seed)
     device = torch.device(cfg.geometry.device)
     ckpt_dir = Path(cfg.geometry.checkpoint_dir)
-    encoder, head = _load_model(ckpt_dir, device)
+    encoder, head = _load_model(ckpt_dir, device, cfg)
 
     t0 = time.time()
     z = _extract_embeddings(encoder, head, cfg, device)

@@ -266,3 +266,300 @@ Mark CheXpert as "loader-only / not factory-integrated" everywhere until Stage 9
 4. Fix probe traceability: checkpoint run ID, duplicate protection, parent directory creation, and metadata validation.
 5. Remove silent exception handling from CheXpert preprocessing.
 6. Align validation augmentation with Hydra config.
+
+---
+
+# Codex Code Review - Current Tree
+
+Author: Codex
+Date: 2026-05-29
+
+Scope reviewed: `src/`, `scripts/`, `configs/`, `tests/`, `README.md`,
+`CLAUDE.md`, `AGENTS.md`, `BUG_codex.md`, `BUG_claude_code.md`, and current
+run/report artifacts.
+
+Verification run:
+
+- `.\.venv\Scripts\python.exe -m pytest -q --no-cov`
+  - Result: `219 passed in 11.88s`.
+- `.\.venv\Scripts\python.exe -m compileall -q src scripts tests`
+  - Result: passed.
+- `.\.venv\Scripts\python.exe -m scripts.train.ablate --help`
+  - Result: passed; config uses the new `scripts.train.*` and
+    `scripts.analysis.*` module paths.
+- `.\.venv\Scripts\python.exe -m scripts.analysis.probe --help`
+  - Result: passed.
+- `.\.venv\Scripts\python.exe -m scripts.analysis.analyze_geometry --help`
+  - Result: passed.
+- `.\.venv\Scripts\python.exe -m scripts.analysis.make_paper_tables --help`
+  - Result: passed.
+- `.\.venv\Scripts\python.exe -m scripts.analysis.make_paper_tables --input runs\results\ablation_1seed_master.csv --output-dir runs\tables`
+  - Result: passed; warned correctly that the old CSV predates test metrics and
+    fell back to validation metrics.
+- CheXpert factory deferral check:
+  - `get_dataset(OmegaConf.load("configs/data/chexpert.yaml"), "train", None)`
+  - Result: raises the intended descriptive `ValueError`:
+    `CheXpert is not yet integrated - see CLAUDE.md Dataset Scope.`
+
+## Open Findings
+
+### 1. Linear probe breaks when exactly one class remains evaluable
+
+Severity: Medium
+
+Evidence:
+
+- `scripts/analysis/probe.py:160-164` keeps a class when val has positives and
+  negatives and train has at least one positive.
+- `scripts/analysis/probe.py:190-194` applies the same rule for test.
+- That filter allows `len(valid_classes) == 1`.
+- `src/metrics/linear_probe.py:44-49` always wraps `LogisticRegression` in
+  `OneVsRestClassifier` and passes `clf.predict_proba(x_val)` directly to
+  `multilabel_auc`.
+
+Reproduction:
+
+```powershell
+.\.venv\Scripts\python.exe -c "import numpy as np; from src.metrics.linear_probe import linear_probe; train_emb=np.random.RandomState(0).randn(6,4).astype('float32'); val_emb=np.random.RandomState(1).randn(4,4).astype('float32'); train_labels=np.array([[0],[1],[0],[1],[0],[1]], dtype=np.int32); val_labels=np.array([[0],[1],[0],[1]], dtype=np.int32); print(linear_probe(train_emb, train_labels, val_emb, val_labels))"
+```
+
+Observed result:
+
+`ValueError: scores and labels must have the same shape, got (4, 2) vs (4, 1)`
+
+Impact:
+
+Probe can fail on tiny smoke subsets or filtered CheXpert-style splits even
+when one class is legitimately evaluable. The current zero-evaluable-class
+guard does not catch this because one valid class is enough to pass it.
+
+Suggested fix:
+
+Handle the single-class case explicitly in `linear_probe()` by fitting a plain
+binary `LogisticRegression` and using `predict_proba(...)[:, 1:2]`. Also update
+the probe valid-class filters to require both positive and negative examples in
+the training labels: `0 < train_lbl[:, c].sum() < train_lbl.shape[0]`.
+
+### 2. Probe and geometry can evaluate a checkpoint with the wrong data config
+
+Severity: Medium
+
+Evidence:
+
+- `scripts/analysis/probe.py:106-108` loads encoder/head architecture from the
+  checkpoint config.
+- `scripts/analysis/probe.py:139-152` builds train/val/test datasets from
+  `cfg.data`, not `ckpt_cfg.data`.
+- `scripts/analysis/probe.py:286-292` writes row metadata from `cfg.meta`, not
+  the checkpoint config.
+- `scripts/analysis/analyze_geometry.py:58-60` loads model architecture from
+  the checkpoint config.
+- `scripts/analysis/analyze_geometry.py:74-97` builds datasets from `cfg.data`.
+- `scripts/analysis/analyze_geometry.py:196-204` writes metadata from `cfg.meta`.
+
+Impact:
+
+A checkpoint trained with one data size, dataset label, or metadata label can be
+probed/analyzed under another if CLI overrides are omitted or wrong. Ablation
+runs pass metadata explicitly, but standalone evaluation remains easy to
+mis-record.
+
+Suggested fix:
+
+Default evaluation data and metadata from `ckpt_cfg`. Permit overrides only via
+explicit flags such as `probe.allow_data_override=true`, and emit a warning or
+raise when `cfg.data.name`, `cfg.data.size`, or `cfg.meta.*` disagrees with the
+checkpoint config.
+
+### 3. Geometry alignment ignores Hydra augmentation overrides
+
+Severity: Medium
+
+Evidence:
+
+- `scripts/analysis/analyze_geometry.py:87-90` builds the two-view transform as
+  `build_contrastive_transform(size=cfg.data.size, mean=mean, std=std)`.
+- Unlike `scripts/train/train_common.py`, it does not pass
+  `cfg.data.augmentation` values for crop, rotation, color jitter, or flip.
+
+Impact:
+
+Training and validation now honor augmentation overrides, but geometry alignment
+does not. If an experiment changes augmentation strength, the geometry report is
+computed under default augmentation rather than the actual experiment setting.
+
+Suggested fix:
+
+Mirror `build_val_loader()` and pass `cfg.data.augmentation` through
+`build_contrastive_transform()` in `_pair_loader()`.
+
+### 4. Result CSV writers still allow duplicate rows
+
+Severity: Medium
+
+Evidence:
+
+- `AGENTS.md:188-189` requires probe results to avoid duplicate
+  `(run_id, seed, dataset)` rows.
+- `scripts/analysis/probe.py:79-86` appends rows without checking existing rows.
+- `scripts/analysis/analyze_geometry.py:168-175` also appends blindly.
+- `scripts/train/ablate.py:49-54` appends master rows blindly.
+- `scripts/analysis/make_paper_tables.py:142-149` detects duplicate
+  `(cell_id, dataset, seed)` rows later and keeps the last, which confirms
+  duplicates are expected downstream rather than prevented at write time.
+
+Impact:
+
+Re-running probe, geometry, or ablation for the same run can silently create
+duplicate source rows. Table generation masks this by keeping the last row, but
+the raw CSVs remain ambiguous and violate the experiment-auditor contract.
+
+Suggested fix:
+
+Before appending, read the target CSV if it exists and reject or replace rows
+with the same identity key:
+
+- Probe: `(run_id, seed, dataset)`.
+- Geometry: `(run_id, seed, dataset)`.
+- Ablation master: `(cell_id, seed, dataset)`.
+
+### 5. CheXpert config still promises a runtime test carve-out that does not exist
+
+Severity: Medium, deferred by current dataset scope
+
+Evidence:
+
+- `CLAUDE.md:98` says CheXpert is not integrated for training yet.
+- `src/data/__init__.py:42` correctly rejects CheXpert through the shared factory.
+- `configs/data/chexpert.yaml:13-15` says the official val set is used and a
+  runtime test carve-out is built from disjoint train patients.
+- `configs/data/chexpert.yaml:48-52` exposes `split_seed` and `test_ratio`.
+- `src/data/chexpert.py:142-143` still maps `split="test"` directly to
+  `test.csv`; no code consumes `split_seed`, `test_ratio`, or
+  `patient_level_split()`.
+
+Impact:
+
+This is not breaking the current ChestMNIST pipeline because CheXpert is
+explicitly deferred. It is still a Stage 9 trap: the comments describe a
+patient-level split guarantee that the loader does not implement.
+
+Suggested fix:
+
+Until Stage 9, change the config comments to say `split=test` is not implemented
+through the factory. When Stage 9 starts, implement the train/test patient
+carve-out in a data module or factory branch and add an integration test for
+train/val/test patient disjointness.
+
+### 6. README installation command references a missing file
+
+Severity: Low
+
+Evidence:
+
+- `README.md:79` says `pip install -r requirements.txt`.
+- `requirements.txt` does not exist in the repo.
+- `pyproject.toml` is present and contains the dependency list.
+
+Impact:
+
+Fresh setup instructions fail before tests or training can start.
+
+Suggested fix:
+
+Either add `requirements.txt` or update the README to use the existing package
+metadata, for example `pip install -e .[dev]` or `pip install -e .`.
+
+### 7. README project structure still lists `scripts/analysis/ablate.py`
+
+Severity: Low
+
+Evidence:
+
+- `README.md:198` correctly lists `scripts/train/ablate.py`.
+- `README.md:204` still lists `scripts/analysis/ablate.py`.
+- Current tree has `scripts/train/ablate.py`; there is no
+  `scripts/analysis/ablate.py`.
+
+Impact:
+
+The current command examples are correct, but the project tree is stale after
+the requested `ablate.py` move.
+
+Suggested fix:
+
+Remove the `scripts/analysis/ablate.py` row from the README structure block.
+
+### 8. Ablation master CSV path is not anchored to the project root
+
+Severity: Low
+
+Evidence:
+
+- `scripts/train/ablate.py:222-225` anchors `probe_csv` and `geom_csv` to
+  `PROJECT_ROOT`, but leaves `out_csv = Path(cfg.ablate.output_csv)` relative
+  to the current process directory.
+
+Impact:
+
+If `scripts.train.ablate` is launched from a directory other than the project
+root, the intermediate probe/geometry CSVs go under the repo but the master CSV
+can be written elsewhere. This makes run artifacts harder to find.
+
+Suggested fix:
+
+Resolve `out_csv` like the others:
+`out_csv = project_root / cfg.ablate.output_csv` unless it is already absolute.
+
+### 9. CheXpert preprocessing reports missing images but exits successfully
+
+Severity: Low
+
+Evidence:
+
+- `scripts/preprocess/preprocess_chexpert.py:53-55` returns `"missing"` when a
+  source image is absent.
+- `scripts/preprocess/preprocess_chexpert.py:118-126` prints a warning if any
+  paths are missing.
+- `scripts/preprocess/preprocess_chexpert.py:127` still returns `0`.
+
+Impact:
+
+An automated preprocessing job can succeed at the process level while producing
+an incomplete image tree. The warning is visible to a human, but CI or batch
+scripts may treat the cache as valid.
+
+Suggested fix:
+
+Return a non-zero exit code when `counts["missing"] > 0`, or add an explicit
+`--allow-missing` flag for intentionally partial debug runs.
+
+## Checks That Look Good
+
+- Full test suite is green: `219 passed`.
+- `compileall` passes for `src`, `scripts`, and `tests`.
+- Script entry points after the reorganization are importable:
+  `scripts.train.ablate`, `scripts.analysis.probe`,
+  `scripts.analysis.analyze_geometry`, and `scripts.analysis.make_paper_tables`.
+- No stale `scripts.rest` references were found.
+- All `src/{models,losses,metrics,data}` Python modules are under the R10
+  200-line limit.
+- No wildcard imports were found in `src/`, `scripts/`, or `tests/`.
+- Previously reported issues now fixed in the current tree include:
+  `runs/figures` missing, CheXpert config missing `name`, table generation
+  defaulting to validation metrics, probe run IDs not matching checkpoint dirs,
+  probe CSV parent creation, zero-evaluable-class probe guard, validation
+  augmentation in training, broad silent CheXpert preprocessing exception,
+  `patient_level_split()` return annotation, and rare-AUROC parser robustness.
+
+## Recommended Fix Order
+
+1. Fix `linear_probe()` for single-class inputs and strengthen the probe
+   valid-class filter for train all-positive/all-negative classes.
+2. Make probe/geometry default to checkpoint data and metadata, with explicit
+   override guards.
+3. Add duplicate-row protection to probe, geometry, and ablation CSV writers.
+4. Thread augmentation overrides into geometry alignment.
+5. Clarify the deferred CheXpert test-split comments or implement the Stage 9
+   patient-level carve-out when CheXpert is activated.
+6. Clean up README setup and project-structure drift.

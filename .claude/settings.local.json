@@ -98,7 +98,9 @@
       "Bash(./.venv/Scripts/python.exe scripts/make_paper_tables.py --input runs/results/ablation_1seed_master.csv --publish)",
       "Bash(./.venv/Scripts/python.exe -m pytest -q --no-cov)",
       "Bash(./.venv/Scripts/python.exe -c 'from omegaconf import OmegaConf; from src.data import get_dataset; cfg=OmegaConf.load\\('\\\\''configs/data/chexpert.yaml'\\\\''\\) *)",
-      "Bash(py --version)"
+      "Bash(py --version)",
+      "Bash(git *)",
+      "Bash(echo \"=== compile exit: $? ===\")"
     ]
   }
 }

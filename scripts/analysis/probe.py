@@ -78,12 +78,22 @@ def _extract_embeddings(
 
 def _append_csv_row(csv_path: Path, row: dict) -> None:
     csv_path.parent.mkdir(parents=True, exist_ok=True)
-    write_header = not csv_path.exists()
-    with open(csv_path, "a", newline="") as f:
+    # Replace any prior row sharing the (run_id, seed, dataset) identity so
+    # re-running the probe on a checkpoint overwrites rather than appends a
+    # duplicate (AGENTS.md probe-results contract).
+    key = (str(row["run_id"]), str(row["seed"]), str(row["dataset"]))
+    kept: list[dict] = []
+    if csv_path.exists():
+        with open(csv_path, "r", newline="") as f:
+            for r in csv.DictReader(f):
+                r_key = (str(r.get("run_id")), str(r.get("seed")), str(r.get("dataset")))
+                if r_key != key:
+                    kept.append({k: r.get(k, "") for k in _CSV_COLUMNS})
+    kept.append({k: row.get(k, "") for k in _CSV_COLUMNS})
+    with open(csv_path, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=_CSV_COLUMNS)
-        if write_header:
-            writer.writeheader()
-        writer.writerow(row)
+        writer.writeheader()
+        writer.writerows(kept)
 
 
 @hydra.main(version_base=None, config_path="../../configs/experiment", config_name="probe")
@@ -104,6 +114,22 @@ def main(cfg: DictConfig) -> None:
         raise ValueError(f"No config.yaml found in checkpoint_dir: {ckpt_dir}")
 
     ckpt_cfg = OmegaConf.load(ckpt_cfg_path)
+
+    # R9: the probe builds datasets from cfg.data (not ckpt_cfg.data), so a
+    # mismatched data config would silently evaluate the checkpoint on the
+    # wrong dataset/resolution and mis-record the row. Fail loudly instead.
+    ckpt_data = ckpt_cfg.get("data", {})
+    for field in ("name", "size"):
+        ckpt_val = ckpt_data.get(field)
+        cur_val = cfg.data.get(field)
+        if ckpt_val is not None and cur_val is not None and ckpt_val != cur_val:
+            raise ValueError(
+                f"[probe] data.{field} mismatch: checkpoint was trained with "
+                f"{field}={ckpt_val!r} but probe cfg.data.{field}={cur_val!r}. "
+                f"Probing under a different data config corrupts the result row. "
+                f"Set cfg.data.{field}={ckpt_val!r} or point at the matching data config."
+            )
+
     encoder = instantiate(ckpt_cfg.model.encoder).to(device)
     head = instantiate(ckpt_cfg.model.head).to(device)
 
@@ -160,7 +186,7 @@ def main(cfg: DictConfig) -> None:
     valid_classes = [
         c for c in range(val_lbl.shape[1])
         if 0 < val_lbl[:, c].sum() < val_lbl.shape[0]
-        and train_lbl[:, c].sum() > 0
+        and 0 < train_lbl[:, c].sum() < train_lbl.shape[0]
     ]
     n_classes_valid = len(valid_classes)
     dropped_ids = [
@@ -176,12 +202,12 @@ def main(cfg: DictConfig) -> None:
     dropped_no_train = [
         c for c in range(val_lbl.shape[1])
         if 0 < val_lbl[:, c].sum() < val_lbl.shape[0]
-        and train_lbl[:, c].sum() == 0
+        and not (0 < train_lbl[:, c].sum() < train_lbl.shape[0])
     ]
     if dropped_no_train:
         print(
             f"[probe] Warning: {len(dropped_no_train)} class(es) have val positives "
-            f"but 0 train positives and are excluded from AUROC "
+            f"but 0 train positives or 0 train negatives and are excluded from AUROC "
             f"(class ids: {dropped_no_train})."
         )
 
@@ -190,7 +216,7 @@ def main(cfg: DictConfig) -> None:
     valid_classes_test = [
         c for c in range(test_lbl.shape[1])
         if 0 < test_lbl[:, c].sum() < test_lbl.shape[0]
-        and train_lbl[:, c].sum() > 0
+        and 0 < train_lbl[:, c].sum() < train_lbl.shape[0]
     ]
     n_classes_valid_test = len(valid_classes_test)
     dropped_ids_test = [
@@ -206,12 +232,12 @@ def main(cfg: DictConfig) -> None:
     dropped_no_train_test = [
         c for c in range(test_lbl.shape[1])
         if 0 < test_lbl[:, c].sum() < test_lbl.shape[0]
-        and train_lbl[:, c].sum() == 0
+        and not (0 < train_lbl[:, c].sum() < train_lbl.shape[0])
     ]
     if dropped_no_train_test:
         print(
             f"[probe] Warning: {len(dropped_no_train_test)} class(es) have test positives "
-            f"but 0 train positives and are excluded from test AUROC "
+            f"but 0 train positives or 0 train negatives and are excluded from test AUROC "
             f"(class ids: {dropped_no_train_test})."
         )
 

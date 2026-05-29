@@ -46,12 +46,21 @@ _COLUMNS = [
 
 def _append_row(csv_path: Path, row: dict) -> None:
     csv_path.parent.mkdir(parents=True, exist_ok=True)
-    write_header = not csv_path.exists()
-    with open(csv_path, "a", newline="") as f:
+    # Replace any prior master row sharing the (cell_id, seed, dataset) identity
+    # so re-running a cell overwrites rather than appending a duplicate.
+    key = (str(row.get("cell_id")), str(row.get("seed")), str(row.get("dataset")))
+    kept: list[dict] = []
+    if csv_path.exists():
+        with open(csv_path, "r", newline="") as f:
+            for r in csv.DictReader(f):
+                r_key = (str(r.get("cell_id")), str(r.get("seed")), str(r.get("dataset")))
+                if r_key != key:
+                    kept.append({k: r.get(k, "") for k in _COLUMNS})
+    kept.append({k: row.get(k, "") for k in _COLUMNS})
+    with open(csv_path, "w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=_COLUMNS)
-        if write_header:
-            w.writeheader()
-        w.writerow({k: row.get(k, "") for k in _COLUMNS})
+        w.writeheader()
+        w.writerows(kept)
 
 
 def _run(cmd: list[str], cwd: Path) -> str:
@@ -220,7 +229,11 @@ def main(cfg: DictConfig) -> None:
         raise ValueError("ablate.seeds is empty — at least one seed required.")
 
     project_root = Path(os.environ["PROJECT_ROOT"])
+    # Anchor the master CSV to the project root (like probe/geom below) so it
+    # lands with the other artifacts regardless of the launch directory.
     out_csv = Path(cfg.ablate.output_csv)
+    if not out_csv.is_absolute():
+        out_csv = project_root / out_csv
     probe_csv = project_root / cfg.ablate.probe_csv
     geom_csv = project_root / cfg.ablate.geometry_csv
     global_overrides = [str(item) for item in cfg.ablate.get("global_overrides", [])]

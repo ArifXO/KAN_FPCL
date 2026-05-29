@@ -114,19 +114,30 @@ def _resolve_split(df: pd.DataFrame, requested: str) -> str:
     return "val"
 
 
-def _per_class_col(df: pd.DataFrame, split: str) -> str:
-    """Per-class AUROC JSON column for the chosen split, with val fallback."""
-    if split == "test" and "per_class_auroc_linear_test_json" in df.columns:
-        return "per_class_auroc_linear_test_json"
-    return "per_class_auroc_linear_json"
+def _per_class_cols(df: pd.DataFrame, split: str) -> tuple[str, ...]:
+    """Per-class AUROC JSON columns in preference order (test first, then val).
+
+    Returns every candidate present so rare-AUROC extraction can fall back
+    row-by-row, matching the per-row coalescing in ``_metric_column``.
+    """
+    candidates = []
+    if split == "test":
+        candidates.append("per_class_auroc_linear_test_json")
+    candidates.append("per_class_auroc_linear_json")
+    return tuple(c for c in candidates if c in df.columns)
 
 
 def _metric_column(df: pd.DataFrame, canonical: str, aliases: dict[str, tuple[str, ...]]) -> str:
+    # Coalesce per-row across alias columns in preference order: take the first
+    # alias's value for each row, filling blanks from later aliases. This makes
+    # the test->val fallback row-level, so in a mixed CSV a row that lacks a
+    # test value still reports its val number instead of collapsing to NA.
+    series = None
     for name in aliases[canonical]:
         if name in df.columns:
-            df[canonical] = pd.to_numeric(df[name], errors="coerce")
-            return canonical
-    df[canonical] = math.nan
+            col = pd.to_numeric(df[name], errors="coerce")
+            series = col if series is None else series.fillna(col)
+    df[canonical] = series if series is not None else math.nan
     return canonical
 
 
@@ -229,7 +240,7 @@ def _extract_rare_auroc(json_str: str) -> float:
         return float("nan")
 
 
-def _build_tables(df: pd.DataFrame, per_class_col: str) -> dict[str, pd.DataFrame]:
+def _build_tables(df: pd.DataFrame, per_class_cols: tuple[str, ...]) -> dict[str, pd.DataFrame]:
     # Each hypothesis isolates EXACTLY ONE experimental factor:
     # H1: head architecture     (fixed: InfoNCE loss, no scorer)
     # H2: loss function         (fixed: MLP head)
@@ -257,8 +268,15 @@ def _build_tables(df: pd.DataFrame, per_class_col: str) -> dict[str, pd.DataFram
         return sub
 
     def _rare_source(sub: pd.DataFrame) -> str:
-        if per_class_col in sub.columns:
-            sub["rare_auroc"] = sub[per_class_col].apply(_extract_rare_auroc)
+        present = [c for c in per_class_cols if c in sub.columns]
+        if present:
+            # Coalesce per row across the candidate JSON columns (test then val)
+            # so a row lacking a test fingerprint still reports its val rare AUROC.
+            rare = None
+            for col in present:
+                vals = sub[col].apply(_extract_rare_auroc)
+                rare = vals if rare is None else rare.fillna(vals)
+            sub["rare_auroc"] = rare
             return "rare_auroc"
         return "rare_disease_auroc"
 
@@ -414,8 +432,8 @@ def main() -> None:
     raw = _read_ablation(in_path)
     split = _resolve_split(raw, args.split)
     df = _prepare(raw, args.include_smoke, args.include_failed, _metric_aliases(split))
-    per_class_col = _per_class_col(df, split)
-    tables = _build_tables(df, per_class_col)
+    per_class_cols = _per_class_cols(df, split)
+    tables = _build_tables(df, per_class_cols)
     split_tag = "test split" if split == "test" else "VAL split (biased)"
     titles = {
         "table_h1.md": f"H1 Geometry: MLP vs KAN vs res_KAN ({split_tag})",

@@ -41,12 +41,21 @@ def linear_probe(
     x_train = scaler.fit_transform(train_emb)
     x_val = scaler.transform(val_emb)
 
-    clf = OneVsRestClassifier(
-        LogisticRegression(C=C, max_iter=max_iter, solver="lbfgs"),
-        n_jobs=-1,
-    )
-    clf.fit(x_train, train_labels)
-    scores = clf.predict_proba(x_val)
+    # With a single evaluable class, OneVsRestClassifier.predict_proba returns
+    # a 2-column [P(neg), P(pos)] array that breaks multilabel_auc's [N, C]
+    # shape contract. Fit a plain binary LogisticRegression and keep P(pos) as
+    # a single [N, 1] column so the downstream AUROC path is shape-consistent.
+    if train_labels.shape[1] == 1:
+        clf = LogisticRegression(C=C, max_iter=max_iter, solver="lbfgs")
+        clf.fit(x_train, train_labels.ravel())
+        scores = clf.predict_proba(x_val)[:, 1:2]
+    else:
+        clf = OneVsRestClassifier(
+            LogisticRegression(C=C, max_iter=max_iter, solver="lbfgs"),
+            n_jobs=-1,
+        )
+        clf.fit(x_train, train_labels)
+        scores = clf.predict_proba(x_val)
 
     metrics = multilabel_auc(scores, val_labels)
     metrics["n_train"] = int(train_emb.shape[0])

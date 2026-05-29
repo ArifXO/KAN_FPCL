@@ -75,8 +75,8 @@ git clone <repo-url> && cd cxr-kan-contrastive
 # Create venv
 python3.11 -m venv venv && source venv/bin/activate
 
-# Install dependencies
-pip install -r requirements.txt
+# Install dependencies (dependency list lives in pyproject.toml)
+pip install -e .[dev]
 # torch, torchvision, hydra-core, omegaconf, medmnist, einops, 
 # scikit-learn, pandas, numpy, tqdm, pytest, pytest-cov, pytorch-lightning (optional)
 ```
@@ -201,7 +201,6 @@ cxr-kan-contrastive/
 │   └── analysis/
 │       ├── probe.py                   # Frozen-encoder downstream eval (Stage 3+)
 │       ├── analyze_geometry.py        # Geometry metrics on checkpoint
-│       ├── ablate.py                  # Ablation runner (Stage 10)
 │       └── make_paper_tables.py       # Generate H1-H4 tables
 │
 ├── configs/

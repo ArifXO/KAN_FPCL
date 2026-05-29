@@ -168,8 +168,9 @@ def main(cfg: DictConfig) -> None:
             step_dict = base_step_metrics(step, scheduler.get_last_lr()[0], out, epoch=epoch)
             step_dict["p_fn_reg_loss"] = float(p_fn_reg.detach())
             step_dict["total_loss"] = float(total_loss.detach())
-            if hasattr(head, "alpha"):
-                step_dict["alpha"] = float(head.alpha.detach())
+            head_alpha = getattr(head, "alpha", None)
+            if head_alpha is not None:
+                step_dict["alpha"] = float(head_alpha.detach())
             step_metrics.append(step_dict)
 
             if step % cfg.train.log_every == 0:

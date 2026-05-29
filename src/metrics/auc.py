@@ -42,7 +42,9 @@ def multilabel_auc(
             "AUROC is undefined. Filter or merge these classes first."
         )
 
-    per_class_auroc = roc_auc_score(labels, scores, average=None)
+    # With a single class, roc_auc_score(average=None) returns a scalar rather
+    # than an array; wrap so per-class handling stays uniform.
+    per_class_auroc = np.atleast_1d(roc_auc_score(labels, scores, average=None))
     macro_auroc = float(np.mean(per_class_auroc))
     micro_auroc = float(roc_auc_score(labels, scores, average="micro"))
     map_score = float(average_precision_score(labels, scores, average="macro"))

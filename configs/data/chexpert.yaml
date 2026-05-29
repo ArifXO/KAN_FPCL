@@ -9,10 +9,13 @@
 # contains train.csv / valid.csv and the CheXpert-v1.0 image tree (or the
 # preprocessed copy emitted by scripts/preprocess/preprocess_chexpert.py).
 #
-# Patient-level splitting (R4/R5) is enforced inside CheXpertDataset via
-# chexpert_patient_ids_from_paths(). The official `valid.csv` is used as
-# `val`; a `test` carve-out is built at runtime from disjoint train
-# patients using patient_level_split.
+# Patient-level splitting (R4/R5) helpers exist (chexpert_patient_ids_from_paths,
+# patient_level_split) but are NOT yet wired into the runtime path. Today
+# `split=val` maps to valid.csv and `split=test` maps directly to test.csv
+# (src/data/chexpert.py); the promised train-patient carve-out for `test`,
+# `split_seed`, and `test_ratio` below are Stage-9 placeholders that no code
+# consumes yet. Do not assume a patient-level test split until Stage 9 wires
+# it into get_dataset()/train/probe/geometry with a disjointness test.
 
 # Dataset key consumed by src.data.get_dataset(). Present so the factory
 # returns the descriptive "CheXpert is not yet integrated" error (R9) rather
