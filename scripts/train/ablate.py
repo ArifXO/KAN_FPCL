@@ -7,7 +7,7 @@ then append one merged row to ``ablation_master.csv``.
 A failure in any sub-step is captured as ``status=FAILED: <exception>`` so
 the next cell still runs — one OOM must not lose the rest of the matrix.
 
-Sub-scripts are invoked as subprocesses (``python -m scripts.<name>``) and
+Sub-scripts are invoked as subprocesses (``python -m scripts.<group>.<name>``) and
 re-use their existing Hydra configs; this script only orchestrates and
 merges the per-step CSV rows.
 """
@@ -24,7 +24,7 @@ import traceback
 from pathlib import Path
 
 os.environ.setdefault(
-    "PROJECT_ROOT", str(Path(__file__).resolve().parent.parent).replace("\\", "/")
+    "PROJECT_ROOT", str(Path(__file__).resolve().parents[2]).replace("\\", "/")
 )
 
 import hydra
@@ -112,7 +112,7 @@ def _probe(
     ckpt_dir: Path, cell: DictConfig, seed: int, csv_path: Path, project_root: Path
 ) -> dict[str, str]:
     cmd = [
-        sys.executable, "-m", "scripts.probe",
+        sys.executable, "-m", "scripts.analysis.probe",
         f"probe.checkpoint_dir={ckpt_dir}",
         f"probe.seed={seed}",
         f"probe.output_csv={csv_path}",
@@ -129,7 +129,7 @@ def _geometry(
     ckpt_dir: Path, cell: DictConfig, seed: int, csv_path: Path, project_root: Path
 ) -> dict[str, str]:
     cmd = [
-        sys.executable, "-m", "scripts.analyze_geometry",
+        sys.executable, "-m", "scripts.analysis.analyze_geometry",
         f"geometry.checkpoint_dir={ckpt_dir}",
         f"geometry.seed={seed}",
         f"geometry.output_csv={csv_path}",
@@ -201,7 +201,7 @@ def _run_cell(
 
 
 @hydra.main(
-    version_base=None, config_path="../configs/experiment", config_name="ablation"
+    version_base=None, config_path="../../configs/experiment", config_name="ablation"
 )
 def main(cfg: DictConfig) -> None:
     if not cfg.ablate.cells:

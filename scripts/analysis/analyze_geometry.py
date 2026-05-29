@@ -9,7 +9,7 @@ import time
 from pathlib import Path
 
 os.environ.setdefault(
-    "PROJECT_ROOT", str(Path(__file__).resolve().parent.parent).replace("\\", "/")
+    "PROJECT_ROOT", str(Path(__file__).resolve().parents[2]).replace("\\", "/")
 )
 
 import hydra
@@ -175,7 +175,7 @@ def _append_csv_row(csv_path: Path, row: dict) -> None:
         writer.writerow(row)
 
 
-@hydra.main(version_base=None, config_path="../configs/experiment", config_name="geometry")
+@hydra.main(version_base=None, config_path="../../configs/experiment", config_name="geometry")
 def main(cfg: DictConfig) -> None:
     if len(cfg.geometry.eval_splits) == 0:
         raise ValueError("geometry.eval_splits must contain at least one split.")

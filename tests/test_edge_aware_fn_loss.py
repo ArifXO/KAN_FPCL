@@ -225,7 +225,7 @@ def test_gradient_flows_to_z_scorer_and_kan_via_edges():
 
 
 def test_gradient_flows_through_edge_to_kan_weights():
-    """Train-script-level guard for H4 (mirrors scripts/train_edge.py).
+    """Train-script-level guard for H4 (mirrors scripts/train/train_edge.py).
 
     With both aux lambdas at 0 and ``z`` detached into *both* the scorer and
     the loss, the ONLY live path from the loss back to the KAN projector

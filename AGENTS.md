@@ -168,7 +168,7 @@ Overall: PASS (0 FAILs)
 **Checklist:**
 
 - [ ] **R6 Hydra Config-Driven:**
-  - Verify `scripts/train.py` or eval script decorated with `@hydra.main(config_path=..., config_name=...)`.
+  - Verify `scripts/train/train.py` or eval script decorated with `@hydra.main(config_path=..., config_name=...)`.
   - Check no hardcoded hyperparams (learning_rate, batch_size, etc.). All must be in config.
   - Verify `cfg.model.hidden_dim`, not magic numbers like `hidden_dim = 64`.
   - Hydra multirun: `python train.py --multirun seed=42,1337,2024`.
@@ -183,13 +183,13 @@ Overall: PASS (0 FAILs)
   - Verify `run_uuid` is generated (timestamp or UUID), not hardcoded by user.
 
 - [ ] **Probe Script (Stage 3+):**
-  - `scripts/probe.py` reads checkpoint, extracts frozen embeddings, runs probe + kNN.
+  - `scripts/analysis/probe.py` reads checkpoint, extracts frozen embeddings, runs probe + kNN.
   - Appends row to `probe_results.csv` with columns:
     - `run_id, encoder, head, loss, scorer, dataset, seed, params_total, macro_auroc_linear, macro_auroc_knn, mAP, runtime_sec`
   - Verify no duplicate rows (same run_id, seed, dataset).
 
 - [ ] **Ablation Runner (Stage 10):**
-  - `scripts/ablate.py` uses Hydra --multirun to sweep ablation matrix.
+  - `scripts/train/ablate.py` uses Hydra --multirun to sweep ablation matrix.
   - For each cell × seed: train → probe → analyze_geometry.
   - On error: mark FAILED in CSV with exception, continue (don't halt).
   - Columns: `cell_id, head, loss, scorer, lambda_edge, lambda_edge_align, dataset, seed, params_total, macro_auroc_linear, macro_auroc_knn, mAP, alignment, uniformity, effective_rank, runtime_sec`
@@ -209,7 +209,7 @@ Overall: PASS (0 FAILs)
 ```
 EXPERIMENT-AUDITOR REPORT
 Stage: <N>
-Script: <scripts/train.py or scripts/probe.py>
+Script: <scripts/train/train.py or scripts/analysis/probe.py>
 
 PASS: R6 Hydra Config-Driven ✓
   - Decorator: @hydra.main(config_path="configs", config_name="smoke_mlp") ✓
@@ -400,7 +400,7 @@ Overall: PASS (0 FAILs)
 3. `/run-subagent pytorch-debugger` on synthetic batch → must PASS before first train run.
 
 ### **Stage 3 (Linear Probe)**
-1. Implement `scripts/probe.py`.
+1. Implement `scripts/analysis/probe.py`.
 2. `/run-subagent experiment-auditor` → must PASS.
 3. Train Stage 2 checkpoint, run probe, commit row to `probe_results.csv`.
 
@@ -417,7 +417,7 @@ Overall: PASS (0 FAILs)
 4. Train MLP baseline on CheXpert, probe, append row.
 
 ### **Stage 10 (Ablation + Final Review)**
-1. Implement `scripts/ablate.py` + `scripts/make_paper_tables.py`.
+1. Implement `scripts/train/ablate.py` + `scripts/analysis/make_paper_tables.py`.
 2. `/run-subagent experiment-auditor` on ablate.py → must PASS.
 3. `/run-subagent code-reviewer` on all changed files → must PASS.
 4. Run full ablation suite across 3 seeds (5 if full).
@@ -453,4 +453,3 @@ Log each invocation with:
 - If FAIL, issue list + suggested fixes
 
 Commit log to `reports/subagent_audits.log`.
-

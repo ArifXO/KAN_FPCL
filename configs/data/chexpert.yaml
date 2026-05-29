@@ -7,7 +7,7 @@
 #
 # CheXpert is NOT bundled with the repo. Set `root` to the directory that
 # contains train.csv / valid.csv and the CheXpert-v1.0 image tree (or the
-# preprocessed copy emitted by scripts/preprocess_chexpert.py).
+# preprocessed copy emitted by scripts/preprocess/preprocess_chexpert.py).
 #
 # Patient-level splitting (R4/R5) is enforced inside CheXpertDataset via
 # chexpert_patient_ids_from_paths(). The official `valid.csv` is used as

@@ -15,7 +15,7 @@ import time
 from pathlib import Path
 
 os.environ.setdefault(
-    "PROJECT_ROOT", str(Path(__file__).resolve().parent.parent).replace("\\", "/")
+    "PROJECT_ROOT", str(Path(__file__).resolve().parents[2]).replace("\\", "/")
 )
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -36,7 +36,7 @@ from train_common import (
 )
 
 
-@hydra.main(version_base=None, config_path="../configs/experiment", config_name="smoke_mlp")
+@hydra.main(version_base=None, config_path="../../configs/experiment", config_name="smoke_mlp")
 def main(cfg: DictConfig) -> None:
     set_seed(cfg.run.seed, deterministic=cfg.run.get("deterministic", False))
     device = torch.device(cfg.run.device)

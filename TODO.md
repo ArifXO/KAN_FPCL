@@ -8,7 +8,7 @@ only; they are not evidence for H1-H4.
 
 ## Current Blocker
 
-Run `scripts/ablate.py` to produce `runs/results/ablation_master.csv`.
+Run `scripts/train/ablate.py` to produce `runs/results/ablation_master.csv`.
 All 4 hypotheses are code-ready but not concluded — no full training runs have
 been executed yet. The CSV currently has only a header row.
 
@@ -100,7 +100,7 @@ MLP baseline checkpoint can be probed.
 **Current evidence:**
 
 - ResNet18 encoder, MLP projector, InfoNCE loss, mask tests, checkpoint utilities,
-  and `scripts/train.py` are implemented.
+  and `scripts/train/train.py` are implemented.
 - Training script includes cosine LR, grad clipping, validation monitoring, and
   step metrics.
 - Baseline probe rows exist in `reports/tables/probe_results.csv`.
@@ -119,7 +119,7 @@ MLP baseline checkpoint can be probed.
 
 **Current evidence:**
 
-- `src/metrics/{auc,linear_probe,knn}.py` and `scripts/probe.py` are implemented.
+- `src/metrics/{auc,linear_probe,knn}.py` and `scripts/analysis/probe.py` are implemented.
 - Probe output now includes `per_class_auroc_linear_json`.
 - ChestMNIST per-class AUROC JSON keys are class names, including `hernia`.
 - Output path is `reports/tables/probe_results.csv`.
@@ -180,7 +180,7 @@ wired.
 
 - `src/losses/fn_weighted_infonce.py` and `src/models/pair_scorer.py` exist.
 - `MLPPairScorer` is implemented.
-- `scripts/train_fn.py` is implemented with training stability controls.
+- `scripts/train/train_fn.py` is implemented with training stability controls.
 - `configs/experiment/full_mlp_fn_mlp.yaml` exists and runs 10K-step full config.
 - `tests/test_fn_weighted_loss.py` and `tests/test_pair_scorer.py` exist.
 
@@ -221,7 +221,7 @@ tests pass for lambda-zero behavior.
 
 - `src/losses/edge_features.py` and `src/losses/edge_aware_fn_loss.py` exist.
 - `src/models/edge_aware_scorer.py` exists.
-- `scripts/train_edge.py` is implemented.
+- `scripts/train/train_edge.py` is implemented.
 - `configs/experiment/full_edge_off.yaml`, `full_edge_l005.yaml`, and
   `full_edge_align_l005.yaml` exist.
 - `tests/test_edge_features.py` and `tests/test_edge_aware_fn_loss.py` exist.
@@ -243,7 +243,7 @@ tests pass for lambda-zero behavior.
 - `src/metrics/geometry.py` implements alignment, uniformity, effective rank,
   per-dimension standard deviation, and off-diagonal covariance norm.
 - `src/metrics/embedding_viz.py` implements UMAP/PCA visualization output.
-- `scripts/analyze_geometry.py` appends to `reports/tables/geometry.csv`.
+- `scripts/analysis/analyze_geometry.py` appends to `reports/tables/geometry.csv`.
 - `tests/test_geometry.py` exists.
 
 **Open items:**
@@ -283,7 +283,7 @@ FAILED rows, and all four paper tables are generated.
 
 **Current evidence:**
 
-- `scripts/ablate.py` exists.
+- `scripts/train/ablate.py` exists.
 - `configs/experiment/ablation.yaml` has 11 cells and seeds `[42, 1337, 2024]`.
 - 11 full training configs exist:
   - `full_mlp_infonce.yaml`
@@ -297,7 +297,7 @@ FAILED rows, and all four paper tables are generated.
   - `full_edge_align_l005.yaml`
   - `full_zonly_fn.yaml`
   - `full_edge_l005_kan_scorer.yaml` (edge_contrastive_kan cell)
-- `scripts/make_paper_tables.py` exists with `--input` flag, guard clauses,
+- `scripts/analysis/make_paper_tables.py` exists with `--input` flag, guard clauses,
   per-hypothesis coverage warnings, and per-class rare-disease table support.
 - `runs/results/ablation_master.csv` currently has only a header row.
 
@@ -317,7 +317,7 @@ FAILED rows, and all four paper tables are generated.
 ## Current Next Actions
 
 1. Run the 33-row ChestMNIST ablation matrix (11 cells × 3 seeds).
-2. Run `scripts/make_paper_tables.py` after ablation rows exist.
+2. Run `scripts/analysis/make_paper_tables.py` after ablation rows exist.
 3. Review generated tables and record H1-H4 outcomes.
 4. Keep CheXpert deferred until Stage 9 is deliberately activated.
 

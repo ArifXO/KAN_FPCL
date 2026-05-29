@@ -1,5 +1,5 @@
 # configs/experiment/ablation.yaml
-# Stage 10: cell × seed ablation matrix orchestrated by scripts/ablate.py.
+# Stage 10: cell x seed ablation matrix orchestrated by scripts/train/ablate.py.
 #
 # LABEL VERIFICATION (check these match actual model configs):
 # Cell 1 mlp_infonce       -> mlp_baseline.yaml           -> MLPHead                            ✓
@@ -20,8 +20,8 @@
 #
 # To add a cell: append an entry to `cells` with:
 #   - cell_id            : unique snake_case label used in CSV + checkpoint run name
-#   - train_script       : python module path (e.g. scripts.train, scripts.train_fn,
-#                          scripts.train_edge)
+#   - train_script       : python module path (e.g. scripts.train.train,
+#                          scripts.train.train_fn, scripts.train.train_edge)
 #   - train_config       : one of the full_*.yaml experiment configs
 #   - head / loss / scorer / lambda_edge / lambda_edge_align: CSV label fields
 #   - dataset            : label only (chestmnist | chexpert)
@@ -51,7 +51,7 @@ ablate:
     # Cell 1 — H1 baseline: MLP projector + plain InfoNCE, no scorer.
     - cell_id: mlp_infonce
       hypothesis: h1
-      train_script: scripts.train
+      train_script: scripts.train.train
       train_config: full_mlp_infonce
       head: mlp
       loss: infonce
@@ -64,7 +64,7 @@ ablate:
     # Cell 2 — H1: FastKAN projector + plain InfoNCE, no scorer.
     - cell_id: kan_infonce
       hypothesis: h1
-      train_script: scripts.train
+      train_script: scripts.train.train
       train_config: full_kan_infonce
       head: fastkan
       loss: infonce
@@ -77,7 +77,7 @@ ablate:
     # Cell 3 — H1: Residual FastKAN projector + plain InfoNCE, no scorer.
     - cell_id: reskan_infonce
       hypothesis: h1
-      train_script: scripts.train
+      train_script: scripts.train.train
       train_config: full_reskan_infonce
       head: residual_fastkan
       loss: infonce
@@ -93,7 +93,7 @@ ablate:
     # claim — compare only against kan_infonce to disentangle the effective_rank confound.
     - cell_id: kan_wide_infonce
       hypothesis: h1
-      train_script: scripts.train
+      train_script: scripts.train.train
       train_config: full_kan_wide_infonce
       head: fastkan_wide
       loss: infonce
@@ -108,7 +108,7 @@ ablate:
     # Cell 4 — H2: MLP projector + FN-weighted InfoNCE + MLP pair scorer.
     - cell_id: mlp_fn_mlp
       hypothesis: h2
-      train_script: scripts.train_fn
+      train_script: scripts.train.train_fn
       train_config: full_mlp_fn_mlp
       head: mlp
       loss: fn_weighted
@@ -123,7 +123,7 @@ ablate:
     # Cell 5 — H3: MLP projector + FN-weighted InfoNCE + KAN pair scorer.
     - cell_id: mlp_fn_kan
       hypothesis: h3
-      train_script: scripts.train_fn
+      train_script: scripts.train.train_fn
       train_config: full_mlp_fn_kan
       head: mlp
       loss: fn_weighted
@@ -136,7 +136,7 @@ ablate:
     # Cell 6 — H3+H1: FastKAN projector + FN-weighted + KAN scorer.
     - cell_id: kan_fn_kan
       hypothesis: h3
-      train_script: scripts.train_fn
+      train_script: scripts.train.train_fn
       train_config: full_reskan_fn_kan
       head: fastkan
       loss: fn_weighted
@@ -159,7 +159,7 @@ ablate:
     # Any delta vs zonly_fn comes from richer pair features (edge in scorer), not aux losses.
     - cell_id: edge_scorer_no_aux
       hypothesis: h4
-      train_script: scripts.train_edge
+      train_script: scripts.train.train_edge
       train_config: full_edge_scorer_no_aux
       head: fastkan
       loss: edge_aware_fn
@@ -174,7 +174,7 @@ ablate:
     # Cell 8 — H4 treatment A: edge contrastive aux ON (lambda_edge=0.05).
     - cell_id: edge_contrastive
       hypothesis: h4
-      train_script: scripts.train_edge
+      train_script: scripts.train.train_edge
       train_config: full_edge_l005
       head: fastkan
       loss: edge_aware_fn
@@ -189,7 +189,7 @@ ablate:
     # Cell 9 — H4 treatment B: edge-align aux ON (lambda_edge_align=0.05).
     - cell_id: edge_align
       hypothesis: h4
-      train_script: scripts.train_edge
+      train_script: scripts.train.train_edge
       train_config: full_edge_align_l005
       head: fastkan
       loss: edge_aware_fn
@@ -206,7 +206,7 @@ ablate:
     # comparing them against this cell isolates the edge-signal contribution.
     - cell_id: zonly_fn
       hypothesis: h4
-      train_script: scripts.train_edge
+      train_script: scripts.train.train_edge
       train_config: full_zonly_fn
       head: fastkan
       loss: edge_aware_fn
@@ -224,7 +224,7 @@ ablate:
     # whether H4 gains come from edge features or from KAN scorer architecture.
     - cell_id: edge_contrastive_kan
       hypothesis: h3_cross
-      train_script: scripts.train_edge
+      train_script: scripts.train.train_edge
       train_config: full_edge_l005_kan_scorer
       head: fastkan
       loss: edge_aware_fn

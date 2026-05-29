@@ -1,6 +1,6 @@
 """Generate H1-H4 Markdown tables from ``ablation_master.csv``.
 
-The ablation CSV is expected to come from ``scripts/ablate.py``. Failed rows
+The ablation CSV is expected to come from ``scripts/train/ablate.py``. Failed rows
 and smoke rows are excluded by default so thesis tables only average completed
 full-run cells.
 
@@ -23,7 +23,7 @@ import numpy as np
 
 import pandas as pd
 
-PROJECT_ROOT = Path(os.environ.get("PROJECT_ROOT", Path(__file__).resolve().parents[1]))
+PROJECT_ROOT = Path(os.environ.get("PROJECT_ROOT", Path(__file__).resolve().parents[2]))
 
 # ChestMNIST: rarest 3 classes by frequency (hernia ~0.2%, emphysema ~2%, fibrosis ~1.5%)
 RARE_CLASSES = ("hernia", "emphysema", "fibrosis")
@@ -82,13 +82,13 @@ def _read_ablation(path: Path) -> pd.DataFrame:
     if not path.exists():
         raise FileNotFoundError(
             f"Expected ablation CSV at {path}.\n"
-            f"Run scripts/ablate.py first, or pass --input <path> to point to a different file."
+            f"Run scripts/train/ablate.py first, or pass --input <path> to point to a different file."
         )
     df = pd.read_csv(path)
     if len(df) == 0:
         raise ValueError(
             f"{path} exists but has no data rows.\n"
-            f"Run scripts/ablate.py first to populate it."
+            f"Run scripts/train/ablate.py first to populate it."
         )
     missing = sorted(CORE_COLUMNS - set(df.columns))
     if missing:

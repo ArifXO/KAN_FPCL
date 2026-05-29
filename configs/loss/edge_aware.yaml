@@ -3,7 +3,7 @@
 # loss is numerically identical to Stage 7 unless the experiment explicitly
 # turns the aux terms on.
 #
-# Marker `edge_aware: true` tells `scripts/train_edge.py` to compute edge
+# Marker `edge_aware: true` tells `scripts/train/train_edge.py` to compute edge
 # fingerprints and forward them to the scorer + loss.
 
 _target_: src.losses.EdgeAwareFNWeightedInfoNCELoss

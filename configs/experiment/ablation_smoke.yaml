@@ -1,5 +1,5 @@
 # configs/experiment/ablation_smoke.yaml
-# 1-cell × 1-seed smoke for scripts/ablate.py. Run name prefixed `smoke_`
+# 1-cell x 1-seed smoke for scripts/train/ablate.py. Run name prefixed `smoke_`
 # so probe/geometry rows are filterable per CLAUDE.md.
 
 hydra:
@@ -15,7 +15,7 @@ ablate:
 
   cells:
     - cell_id: smoke_mlp_infonce
-      train_script: scripts.train
+      train_script: scripts.train.train
       train_config: smoke_mlp
       head: mlp
       loss: infonce

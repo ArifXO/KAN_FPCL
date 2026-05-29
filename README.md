@@ -92,12 +92,10 @@ Expected: All imports succeed, directories exist, CLAUDE.md and AGENTS.md readab
 ### **Train Stage 2 Baseline (MLP + InfoNCE)**
 
 ```bash
-python scripts/train.py \
-  configs/experiment/smoke_mlp.yaml \
-  seed=42 \
-  model.hidden_dim=64 \
-  batch_size=32 \
-  num_epochs=10
+python -m scripts.train.train \
+  --config-name smoke_mlp \
+  run.seed=42 \
+  data.batch_size=32
 ```
 
 Outputs: `checkpoints/run_<uuid>/` with model, config, metrics, git hash.
@@ -105,10 +103,10 @@ Outputs: `checkpoints/run_<uuid>/` with model, config, metrics, git hash.
 ### **Probe Stage 2 Checkpoint**
 
 ```bash
-python scripts/probe.py \
-  checkpoint=checkpoints/run_<uuid>/model.pt \
-  dataset=chestmnist \
-  seed=42
+python -m scripts.analysis.probe \
+  probe.checkpoint_dir=runs/checkpoints/run_<uuid> \
+  meta.dataset=chestmnist \
+  probe.seed=42
 ```
 
 Appends row to `probe_results.csv`:
@@ -119,7 +117,7 @@ run_id,encoder,head,loss,scorer,dataset,seed,params_total,macro_auroc_linear,mac
 ### **Run Full Ablation (All Stages, 3 Seeds)**
 
 ```bash
-python scripts/ablate.py --multirun seed=42,1337,2024
+python -m scripts.train.ablate --config-name ablation
 ```
 
 Outputs: `ablation_master.csv` with all cells × seeds.
@@ -127,7 +125,7 @@ Outputs: `ablation_master.csv` with all cells × seeds.
 ### **Generate Paper Tables**
 
 ```bash
-python scripts/make_paper_tables.py
+python -m scripts.analysis.make_paper_tables
 ```
 
 Reads from `runs/results/` (ephemeral, git-ignored). Generates:
@@ -193,11 +191,18 @@ cxr-kan-contrastive/
 │       └── reproducibility.py         # set_seed() function
 │
 ├── scripts/
-│   ├── train.py                       # Hydra training entry-point (all stages)
-│   ├── probe.py                       # Frozen-encoder downstream eval (Stage 3+)
-│   ├── analyze_geometry.py            # Geometry metrics on checkpoint
-│   ├── ablate.py                      # Ablation runner (Stage 10)
-│   └── make_paper_tables.py           # Generate H1–H4 tables
+│   ├── train/
+│   │   ├── train.py                   # Stage 2 InfoNCE training entry point
+│   │   ├── train_fn.py                # FN-weighted training entry point
+│   │   ├── train_edge.py              # Edge-aware training entry point
+│   │   └── ablate.py                  # Ablation runner (Stage 10)
+│   ├── preprocess/
+│   │   └── preprocess_chexpert.py     # CheXpert resize/cache preprocessing
+│   └── analysis/
+│       ├── probe.py                   # Frozen-encoder downstream eval (Stage 3+)
+│       ├── analyze_geometry.py        # Geometry metrics on checkpoint
+│       ├── ablate.py                  # Ablation runner (Stage 10)
+│       └── make_paper_tables.py       # Generate H1-H4 tables
 │
 ├── configs/
 │   ├── data/
@@ -380,7 +385,7 @@ See `AGENTS.md` for specifications.
 
 | **Hypothesis** | **Key Files** | **Success Condition** |
 |---|---|---|
-| **H1** | src/models/kan/, tests/test_geometry.py, scripts/analyze_geometry.py | KAN alignment +5%, uniformity, rank match or beat MLP |
+| **H1** | src/models/kan/, tests/test_geometry.py, scripts/analysis/analyze_geometry.py | KAN alignment +5%, uniformity, rank match or beat MLP |
 | **H2** | src/losses/fn_weighted_infonce.py, tests/test_fn_weighted_loss.py | AUROC gain ≥1% absolute over InfoNCE |
 | **H3** | src/models/pair_scorer.py (KAN variant), tests/test_kan_pair_scorer.py | KAN scorer AUROC ≥ MLP scorer AUROC, params ±15% |
 | **H4** | src/losses/edge_aware_fn_loss.py, src/losses/edge_features.py, Stage 7.5 tests | Edge-aware (λ=0.05) ≥ z-only (λ=0), ≥1% gain |

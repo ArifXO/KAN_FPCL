@@ -11,7 +11,7 @@ re-running picks up where it stopped, never overwrites, and never silently
 corrupts a partial file (writes go through a ``.tmp`` then ``replace``).
 
 Usage:
-    python -m scripts.preprocess_chexpert \\
+    python -m scripts.preprocess.preprocess_chexpert \\
         --src /data/chexpert \\
         --dst /data/chexpert_224 \\
         --size 224 \\
