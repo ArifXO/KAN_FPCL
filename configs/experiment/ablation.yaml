@@ -34,10 +34,6 @@
 #
 # CheXpert cells are NOT included here — ChestMNIST only per CLAUDE.md §Dataset Scope.
 
-hydra:
-  searchpath:
-    - file://${oc.env:PROJECT_ROOT}/configs
-
 ablate:
   output_csv: runs/results/ablation_master.csv
   probe_csv: runs/results/_ablate_probe.csv
