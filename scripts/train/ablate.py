@@ -101,6 +101,7 @@ _HYPOTHESIS_DIR = {
     "h3": "h3_kan_scorer",
     "h3_cross": "h3_kan_scorer",
     "h4": "h4_edge_signal",
+    "baselines": "baselines",
 }
 
 

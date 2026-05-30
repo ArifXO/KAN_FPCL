@@ -356,3 +356,164 @@ deferred (Stage 9). Verification at the bottom.
 
 All current-tree findings from both channels are now either fixed in code or
 (Codex #5) documented as deferred. No new failures introduced.
+
+---
+
+## 2026-05-30 — Ablation re-run blocked by CPU-only torch in `.venv`
+
+Source: `/loop` 1-seed ablation invocation, 2026-05-30. Not from a Codex review;
+logged here per CLAUDE.md "address any error and log it" instruction during
+re-running of `ablation_1seed` after the new baselines were added.
+
+**What was broken.** Every cell of the 15-cell, 1-seed ablation failed on
+`encoder.to(device)` with
+`AssertionError: Torch not compiled with CUDA enabled` before any step ran.
+Root cause: `.venv/Scripts/python.exe -c "import torch; print(torch.__version__)"`
+reports **`2.12.0+cpu`** — the project venv is currently CPU-only torch, while
+every `configs/experiment/full_*.yaml` and `chestmnist_*.yaml` hardcodes
+`run.device: cuda`. The previous 1-seed ablation (archived under
+`runs/archive/ablation_1seed_20260528/`) ran on a CUDA build of torch; the
+environment has since been replaced with a CPU wheel (no code change in this
+tree could re-introduce this — it is purely an installed-package state).
+
+**Trigger.** `python -m scripts.train.ablate --config-name=ablation_1seed`
+fails on cell 1 (`mlp_infonce`) and every subsequent cell in `runs/ablation/`
+with the same `Torch not compiled with CUDA enabled` traceback. `nvidia-smi`
+confirms the RTX 3060 is present and idle — this is a wheel problem, not a
+driver problem.
+
+**What was fixed.** Per user direction, reinstalled the matching CUDA wheel.
+Note: the PyTorch index does **not** publish 2.12.0 for cu121 — the oldest
+cu-tag carrying 2.12.0 is cu126. Installed `torch==2.12.0+cu126` and
+`torchvision==0.27.0+cu126` from `https://download.pytorch.org/whl/cu126`
+with `--force-reinstall --no-deps` (the `+cpu` and `+cu126` wheels share the
+`2.12.0` version string, so pip's resolver thought the requirement was already
+satisfied and would not swap them without `--force-reinstall`). The RTX 3060
+(CUDA driver 12.8) accepts cu126 binaries via the standard backward-compat
+contract. Verified:
+
+```
+torch: 2.12.0+cu126
+cuda available: True
+cuda build: 12.6
+device 0: NVIDIA GeForce RTX 3060
+```
+
+InfoNCE smoke (`smoke_mlp`) ran 5 CUDA steps cleanly; the 15-cell ablation
+was then re-launched against `ablation_1seed`.
+
+No silent fallback (R9): the ablation correctly raises and stops at the first
+cell rather than silently switching to CPU and producing incomparable rows.
+
+**Artifacts.** Full per-cell tracebacks captured in
+`logs/ablation_1seed_20260530.log`. The partial `runs/ablation/h1_architecture/`
+directories created during failed startup are empty (no checkpoints written);
+the empty master CSV `runs/results/ablation_1seed_master.csv` was removed.
+
+---
+
+# Rigorous code-base review — 2026-05-30 (Claude Code)
+
+User asked for a fresh end-to-end pass. Both channel files were re-read first
+(BUG_codex.md + the entries above). Verification baseline before the pass:
+`pytest -q --no-cov` = 289 passed; `compileall src scripts tests` = clean;
+all CheXpert-path findings from BUG_codex remain documented-as-deferred per
+the Stage-9 dataset scope. Below are issues **not** previously caught, fixed
+in this pass; no new failures introduced.
+
+## Latent bug — train_fn.py / train_edge.py would crash if `name` is added to FN/edge loss YAMLs
+
+**Source:** self-review (not from `BUG_codex.md`).
+
+**What was broken.** `scripts/train/train.py` pops the metadata key `name`
+from `loss_cfg` before instantiating the loss class (it is used for routing —
+SupCon Oracle vs. label-free — and probe-row tagging). `scripts/train/train_fn.py`
+and `scripts/train/train_edge.py` did **not** pop it. The pattern was masked
+because `configs/loss/fn_weighted_mlp.yaml` and `configs/loss/edge_aware.yaml`
+happened to omit the `name` field, so `loss_cfg` never contained the offending
+key. The bug surfaces the moment anyone adds `name: fn_weighted` to either
+YAML (the natural fix for `probe.py`'s `baseline_family` derivation when run
+standalone — see `probe.py:320-333` which routes on `ckpt_loss.get("name", ...)`):
+`FNWeightedInfoNCELoss(name='fn_weighted', ...)` raises
+`TypeError: __init__() got an unexpected keyword argument 'name'`.
+
+Reproduction (pre-fix):
+
+```python
+loss_cfg = OmegaConf.to_container(cfg.loss, resolve=True)  # has 'name'
+loss_cfg.pop("fn_schedule", None)                          # name still there
+loss_target = loss_cfg.pop("_target_")
+hydra.utils.get_class(loss_target)(**loss_cfg)  # -> TypeError on 'name'
+```
+
+**What was fixed.**
+
+1. `scripts/train/train_fn.py:55-58` — added `loss_cfg.pop("name", None)`
+   alongside the existing `fn_schedule` pop, with a comment that the key is
+   probe-row metadata (defensive — matches `train.py`'s policy).
+2. `scripts/train/train_edge.py:70-74` — same fix; popped `name` next to
+   `edge_aware` and `fn_schedule`.
+3. `configs/loss/fn_weighted_mlp.yaml` — added `name: fn_weighted`. Routes
+   `probe.py`'s `baseline_family` to `false_negative_aware_method` even for a
+   standalone probe call (i.e., without ablate's `cfg.meta.loss` override).
+4. `configs/loss/edge_aware.yaml` — added `name: edge_aware_fn`. Same effect
+   for Stage-7.5 edge-aware runs.
+
+**Why the configs change matters.** `probe.py:320-321` resolves
+`loss_name = ckpt_loss.get("name", cfg.meta.loss)`. With the pre-fix YAMLs,
+the checkpoint's saved `config.yaml/loss` block had no `name`, so probe.py
+fell back to `cfg.meta.loss` — which only works through the ablate orchestrator
+(which sets `meta.loss` from the `ablation.yaml` cell). A user invoking
+`probe.py probe.checkpoint_dir=...` directly would get
+`baseline_family=self_supervised_baseline` for an FN-weighted or edge-aware
+checkpoint — silently wrong row tagging. The added `name` fields make the
+metadata derivable from the checkpoint alone.
+
+**Verification.**
+
+- `pytest -q --no-cov` → **289 passed** (unchanged).
+- `compileall src scripts tests` → clean.
+- Hydra-compose + emulated `train_fn` / `train_edge` instantiation path
+  across all 8 FN/edge experiment configs (`full_mlp_fn_mlp`,
+  `full_mlp_fn_kan`, `full_reskan_fn_kan`, `full_edge_l005`,
+  `full_edge_align_l005`, `full_edge_scorer_no_aux`, `full_zonly_fn`,
+  `full_edge_l005_kan_scorer`) → every config instantiates without TypeError.
+- No behavioural change for the existing ablation pipeline: the popped `name`
+  was metadata-only; the loss constructors saw the same kwargs as before.
+
+## Areas re-audited, found clean (no change)
+
+- Losses (`infonce`, `fn_weighted_infonce`, `edge_aware_fn_loss`,
+  `debiased_contrastive`, `supcon_oracle`) — R7 dict returns, R9 NaN guards,
+  clamp-before-`log` numerics, `0/0 -> 0` masks in jaccard. Both new
+  baselines (Debiased CL, SupCon Oracle) compose and forward cleanly.
+- Scorers (`MLPPairScorer`, `KANPairScorer`, `EdgeAwarePairScorer`) — symmetric
+  pair features (explicit `0.5*(L+L.T)` for the first two; via symmetric
+  feature construction for the edge-aware variant). Sigmoid bounded.
+- `_metric_column` per-row coalescing (fixed in the prior pass) still resolves
+  test→val per row.
+- `multilabel_masks` — `0/0` empty-vs-empty labels return 0 (no NaN); diagonal
+  False; self-view positives forced to weight 1.0 in jaccard mode.
+- Probe / geometry — checkpoint data-config mismatch guards (`data.name`,
+  `data.size`) in place; duplicate-row protection in all three CSV writers
+  (`probe.py`, `analyze_geometry.py`, `ablate.py`).
+- `make_paper_tables._extract_rare_auroc` catches `(JSONDecodeError, KeyError,
+  TypeError, ValueError)`.
+- `EdgeAwarePairScorer` does not call `0.5*(L+L.T)` but its pair features
+  (`cos`, `l2`, `|z_i - z_j|`, `z_i * z_j`, `e`, `delta`) are each symmetric
+  in (i, j) by construction, so the output is naturally symmetric. Not a bug.
+- All `src/{losses,models,metrics,data}` modules ≤200 lines.
+- No bare `except:`, no `except Exception` outside `scripts/train/ablate.py`'s
+  per-cell guard (which records `status=FAILED` so the rest of the matrix
+  proceeds — intentional, R9-compliant via the descriptive error captured).
+
+## Out of scope for this pass
+
+- **`num_workers: 4` on Windows in `configs/experiment/full_*.yaml` and
+  `chestmnist_*.yaml`.** The 2026-05-30 ablation hang noted earlier in this
+  file is operationally a DataLoader-worker deadlock, not a code defect — the
+  archived 2026-05-28 run used the same configs successfully. No code change
+  here; left for the user to set `data.num_workers=0` via
+  `global_overrides` in `ablation_1seed.yaml` if the hang reproduces.
+- **CheXpert factory branch.** Remains deferred per CLAUDE.md Dataset Scope
+  (Stage 9). `BUG_codex.md` finding #5 (current-tree, deferred) still applies.

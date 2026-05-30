@@ -100,7 +100,18 @@
       "Bash(./.venv/Scripts/python.exe -c 'from omegaconf import OmegaConf; from src.data import get_dataset; cfg=OmegaConf.load\\('\\\\''configs/data/chexpert.yaml'\\\\''\\) *)",
       "Bash(py --version)",
       "Bash(git *)",
-      "Bash(echo \"=== compile exit: $? ===\")"
+      "Bash(echo \"=== compile exit: $? ===\")",
+      "Bash(nvidia-smi)",
+      "Bash(tee logs/ablation_1seed_20260530.log)",
+      "Bash(jobs -p)",
+      "Bash(tasklist /FI \"PID eq $\\(jobs -p 2>/dev/null\\)\")",
+      "Bash(.venv/Scripts/python.exe *)",
+      "Bash(:)",
+      "Bash(tasklist /FI \"IMAGENAME eq python.exe\")",
+      "PowerShell(Get-Process *)",
+      "Bash(nvidia-smi --query-gpu=utilization.gpu,memory.used,memory.total --format=csv)",
+      "Bash(powershell -NoProfile -Command 'Get-Process python -ErrorAction SilentlyContinue | Sort-Object StartTime | Select-Object Id, @{N='\\\\''CPU_s'\\\\'';E={[math]::Round\\($_.CPU,0\\)}}, @{N='\\\\''Mem_MB'\\\\'';E={[math]::Round\\($_.WS/1MB,0\\)}}, StartTime | Format-Table -AutoSize')",
+      "Bash(nvidia-smi --query-gpu=utilization.gpu,memory.used --format=csv,noheader)"
     ]
   }
 }

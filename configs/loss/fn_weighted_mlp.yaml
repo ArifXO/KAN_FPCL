@@ -7,6 +7,10 @@
 # stay within ±15 % of this footprint to validate H3.
 
 _target_: src.losses.FNWeightedInfoNCELoss
+# `name` is informational metadata for probe-row tagging (popped before the
+# loss is instantiated, never passed as a kwarg). Routes probe.py's
+# baseline_family to "false_negative_aware_method".
+name: fn_weighted
 temperature: 0.1
 normalize_embeddings: true
 # Cap on p_fn. 0.5 = floor of 0.5 on negative weights, preventing the

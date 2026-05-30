@@ -7,6 +7,10 @@
 # fingerprints and forward them to the scorer + loss.
 
 _target_: src.losses.EdgeAwareFNWeightedInfoNCELoss
+# `name` is informational metadata for probe-row tagging (popped before the
+# loss is instantiated, never passed as a kwarg). Routes probe.py's
+# baseline_family to "false_negative_aware_method".
+name: edge_aware_fn
 temperature: 0.1
 normalize_embeddings: true
 max_fn_weight: 0.5      # cap FN trivial-optimum reward (Pitfall #5 mitigation)

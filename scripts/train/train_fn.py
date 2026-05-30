@@ -50,10 +50,11 @@ def main(cfg: DictConfig) -> None:
     encoder = instantiate(cfg.model.encoder).to(device)
     head = instantiate(cfg.model.head).to(device)
     scorer = instantiate(cfg.model.scorer).to(device)
-    # Pop fn_schedule before instantiating — it is consumed by the train
-    # loop, not by FNWeightedInfoNCELoss.__init__.
+    # Pop fn_schedule (train-loop concern) and name (probe-row metadata) so
+    # neither is passed to FNWeightedInfoNCELoss.__init__ as an unexpected kwarg.
     loss_cfg = OmegaConf.to_container(cfg.loss, resolve=True)
     loss_cfg.pop("fn_schedule", None)
+    loss_cfg.pop("name", None)
     loss_target = loss_cfg.pop("_target_")
     loss_fn = hydra.utils.get_class(loss_target)(**loss_cfg).to(device)
     full_model = nn.ModuleDict({"encoder": encoder, "head": head, "scorer": scorer})

@@ -231,3 +231,48 @@ ablate:
       overrides:
         - loss.lambda_edge=0.05
         - loss.lambda_edge_align=0.0
+
+    # ── Reference baselines: Debiased CL (label-free) + SupCon Oracle (label-aware) ──
+    # These flank the KAN-FPCL claim: any FN-aware method must beat Debiased CL
+    # (label-free statistical FN correction) and the gap to SupCon Oracle quantifies
+    # remaining label-aware headroom. Both ride on full_mlp_infonce's encoder/budget
+    # so rows are directly comparable. Run via scripts.train.train (routes by cfg.loss.name).
+
+    # Cell 12 — Debiased Contrastive Learning baseline (Chuang et al. 2020).
+    - cell_id: debiased
+      hypothesis: baselines
+      train_script: scripts.train.train
+      train_config: chestmnist_debiased
+      head: mlp
+      loss: debiased
+      scorer: none
+      lambda_edge: 0.0
+      lambda_edge_align: 0.0
+      dataset: chestmnist
+      overrides: []
+
+    # Cell 13 — Multi-label SupCon Oracle (any-overlap positives).
+    - cell_id: supcon_oracle_any_overlap
+      hypothesis: baselines
+      train_script: scripts.train.train
+      train_config: chestmnist_supcon_oracle_any_overlap
+      head: mlp
+      loss: supcon_oracle
+      scorer: none
+      lambda_edge: 0.0
+      lambda_edge_align: 0.0
+      dataset: chestmnist
+      overrides: []
+
+    # Cell 14 — Multi-label SupCon Oracle (Jaccard-weighted positives).
+    - cell_id: supcon_oracle_jaccard
+      hypothesis: baselines
+      train_script: scripts.train.train
+      train_config: chestmnist_supcon_oracle_jaccard
+      head: mlp
+      loss: supcon_oracle
+      scorer: none
+      lambda_edge: 0.0
+      lambda_edge_align: 0.0
+      dataset: chestmnist
+      overrides: []

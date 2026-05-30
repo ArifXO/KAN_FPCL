@@ -65,11 +65,12 @@ def main(cfg: DictConfig) -> None:
     scorer = instantiate(cfg.model.scorer).to(device)
     full_model = nn.ModuleDict({"encoder": encoder, "head": head, "scorer": scorer})
 
-    # Build the loss WITHOUT the marker flag or the train-loop schedule
-    # (script-level concerns, not loss constructor args).
+    # Build the loss WITHOUT the marker flag, the train-loop schedule, or the
+    # probe-row metadata key — none are constructor args for the loss class.
     loss_cfg = OmegaConf.to_container(cfg.loss, resolve=True)
     edge_aware = bool(loss_cfg.pop("edge_aware", True))
     loss_cfg.pop("fn_schedule", None)
+    loss_cfg.pop("name", None)
     loss_target = loss_cfg.pop("_target_")
     loss_fn = hydra.utils.get_class(loss_target)(**loss_cfg).to(device)
 
