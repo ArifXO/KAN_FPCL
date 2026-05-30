@@ -29,3 +29,5 @@ scorer:
   hidden_dim: 5
   num_centers: 6
   use_base_linear: true
+  init_pfn_prior: 0.05      # Pitfall #5: low-prior bias init
+  detach_inputs: true       # block scorer->encoder grad path

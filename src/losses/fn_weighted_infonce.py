@@ -13,15 +13,28 @@ likely-FN pairs inside the InfoNCE denominator:
                                        + Σ_{j∈neg} (1 - p_fn_ij) · exp(s_i,j / τ) ) )
 
 Implemented numerically via ``logits + log(weight)`` inside ``logsumexp`` (R9).
+
+Pitfall #5 mitigations exposed here:
+
+* ``forward(..., max_fn_weight_override=...)`` lets the train loop ramp
+  the cap in from ``0`` (warmup) so the loss is exactly InfoNCE for the
+  first few epochs and only then turns on FN downweighting.
+* ``pfn_regularization`` (constructor kwarg) — mean-prior + cap penalties
+  computed in :mod:`.pfn_diagnostics`. The penalty is returned as
+  ``pfn_reg_total`` (live grad) so the caller adds it *outside* the
+  contrastive ``loss`` key; ``p_fn=0 ⇒ InfoNCE`` (R3) is preserved.
 """
 
 from __future__ import annotations
+
+from typing import Optional
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
 from .masks import build_positive_mask
+from .pfn_diagnostics import pfn_diagnostics, pfn_regularization
 
 
 class FNWeightedInfoNCELoss(nn.Module):
@@ -30,23 +43,19 @@ class FNWeightedInfoNCELoss(nn.Module):
     Args:
         temperature: Softmax temperature τ > 0 (SimCLR default 0.1).
         normalize_embeddings: L2-normalize ``z`` along the embedding axis.
-        max_fn_weight: Upper clip applied to ``p_fn`` before computing the
-            denominator weight. ``1.0`` (default) allows full removal of a
-            negative; ``< 1.0`` caps the maximum downweighting (a floor of
-            ``1 - max_fn_weight`` on negative weights) so suspected FNs
-            still contribute some signal.
+        max_fn_weight: Upper clip on ``p_fn`` for the denominator weight.
+            ``1.0`` allows full removal of a negative; ``< 1.0`` caps it.
+        pfn_regularization: Optional dict (see :func:`pfn_regularization`)
+            enabling the mean-prior + cap-penalty saturation guards.
 
     Forward inputs:
-        z: ``[2B, D]`` — concatenated views ``[v1; v2]`` (positive of ``i`` is
-            ``i + B``).
-        p_fn: ``[B, B]`` — false-negative probabilities among view1 samples,
-            entries in ``[0, 1]``. Tiled to ``[2B, 2B]`` via ``repeat(2, 2)``
-            so the same FN belief applies to all four (vi, vj) view pairings.
+        z: ``[2B, D]`` — concatenated views ``[v1; v2]``.
+        p_fn: ``[B, B]`` — FN beliefs in ``[0, 1]``.
+        max_fn_weight_override: Optional per-call cap (warmup/ramp schedule).
+            When ``None``, ``self.max_fn_weight`` is used.
 
-    Returns (R7):
-        dict with keys ``loss``, ``pos_sim_mean``, ``neg_sim_mean``,
-        ``p_fn_mean``, ``p_fn_max``, ``p_fn_mean_raw``, ``p_fn_max_raw``,
-        ``p_fn_at_cap_fraction``, ``downweighted_fraction``, ``temperature``.
+    Returns (R7) a dict of named scalars; see :func:`pfn_diagnostics` for the
+    raw/clipped breakdown.
     """
 
     def __init__(
@@ -54,6 +63,7 @@ class FNWeightedInfoNCELoss(nn.Module):
         temperature: float = 0.1,
         normalize_embeddings: bool = True,
         max_fn_weight: float = 1.0,
+        pfn_regularization: Optional[dict] = None,
     ):
         super().__init__()
         if temperature <= 0:
@@ -67,9 +77,13 @@ class FNWeightedInfoNCELoss(nn.Module):
         self.temperature = float(temperature)
         self.normalize_embeddings = bool(normalize_embeddings)
         self.max_fn_weight = float(max_fn_weight)
+        self.pfn_reg_cfg = dict(pfn_regularization or {})
 
     def forward(
-        self, z: torch.Tensor, p_fn: torch.Tensor
+        self,
+        z: torch.Tensor,
+        p_fn: torch.Tensor,
+        max_fn_weight_override: Optional[float] = None,
     ) -> dict[str, torch.Tensor]:
         if z.dim() != 2:
             raise ValueError(
@@ -87,14 +101,21 @@ class FNWeightedInfoNCELoss(nn.Module):
                 f"p_fn must be shape [B, B] with B={batch}, got {tuple(p_fn.shape)}"
             )
         if torch.isnan(p_fn).any():
-            raise ValueError(
-                "p_fn contains NaN values; check pair-scorer outputs."
-            )
+            raise ValueError("p_fn contains NaN values; check pair-scorer outputs.")
         if (p_fn < 0).any() or (p_fn > 1).any():
             raise ValueError(
                 f"p_fn must lie in [0, 1], got min={p_fn.min().item():.4f}, "
                 f"max={p_fn.max().item():.4f}. Ensure the scorer applies sigmoid."
             )
+        if max_fn_weight_override is not None:
+            mfw = float(max_fn_weight_override)
+            if not (0.0 <= mfw <= 1.0):
+                raise ValueError(
+                    f"max_fn_weight_override must be in [0, 1], got {mfw}."
+                )
+            max_cap = mfw
+        else:
+            max_cap = self.max_fn_weight
 
         if self.normalize_embeddings:
             z = F.normalize(z, dim=-1, eps=1e-12)
@@ -106,20 +127,12 @@ class FNWeightedInfoNCELoss(nn.Module):
         pos_mask = build_positive_mask(batch).to(z.device)
         neg_mask = ~pos_mask & ~diag_mask
 
-        # Raw scorer diagnostics (before clipping) — detect collapse where
-        # the scorer saturates above max_fn_weight and the clipped stats look fine.
-        raw_p_fn_mean = p_fn.mean().detach()
-        raw_p_fn_max = p_fn.max().detach()
-        at_cap_fraction = (p_fn >= self.max_fn_weight).float().mean().detach()
-
-        # Tile p_fn to [2B, 2B] so the same FN belief applies to (v1,v1),
-        # (v1,v2), (v2,v1), (v2,v2) views of the same pair of underlying images.
-        p_fn_clamped = p_fn.clamp(min=0.0, max=self.max_fn_weight)
-        p_fn_full = p_fn_clamped.repeat(2, 2)
+        # Clipped p_fn drives the denominator weighting; raw p_fn drives the
+        # diagnostics and the saturation regularizer (see pfn_diagnostics).
+        p_fn_clipped = p_fn.clamp(min=0.0, max=max_cap)
+        p_fn_full = p_fn_clipped.repeat(2, 2)
 
         # NUMERICAL: clamp (1 - p_fn) before .log() to avoid -inf when p_fn→1.
-        # torch.where evaluates BOTH branches eagerly (PyTorch semantic), so
-        # the negative branch must itself be finite even at positive slots.
         weight = (1.0 - p_fn_full).clamp_min(1e-10)
         weight = torch.where(pos_mask, torch.ones_like(weight), weight)
         log_weight = weight.log()
@@ -137,21 +150,31 @@ class FNWeightedInfoNCELoss(nn.Module):
             raise RuntimeError(
                 f"FN-weighted InfoNCE produced non-finite loss={loss.item()}. "
                 f"temperature={self.temperature}, batch={batch}, "
-                f"max_fn_weight={self.max_fn_weight}, "
+                f"max_cap={max_cap}, "
                 f"p_fn min={p_fn.min().item():.4f} max={p_fn.max().item():.4f}, "
                 f"sim_raw min={sim_raw.min().item():.4f} max={sim_raw.max().item():.4f}"
             )
 
-        neg_p = p_fn_full[neg_mask]
-        return {
+        diag = pfn_diagnostics(p_fn, p_fn_clipped, max_cap)
+        reg = pfn_regularization(p_fn, max_cap, self.pfn_reg_cfg)
+
+        neg_p_clipped = p_fn_full[neg_mask]
+        neg_w = (1.0 - p_fn_full)[neg_mask]
+        out = {
             "loss": loss,
             "pos_sim_mean": sim_raw[pos_mask].mean().detach(),
             "neg_sim_mean": sim_raw[neg_mask].mean().detach(),
-            "p_fn_mean": neg_p.mean().detach(),
-            "p_fn_max": neg_p.max().detach(),
-            "p_fn_mean_raw": raw_p_fn_mean,
-            "p_fn_max_raw": raw_p_fn_max,
-            "p_fn_at_cap_fraction": at_cap_fraction,
-            "downweighted_fraction": (neg_p > 0.5).float().mean().detach(),
+            # Back-compat clipped-neg-only summaries (Stage 6 schema).
+            "p_fn_mean": neg_p_clipped.mean().detach(),
+            "p_fn_max": neg_p_clipped.max().detach(),
+            "p_fn_mean_raw": diag["p_fn_raw_mean"],
+            "p_fn_max_raw": diag["p_fn_raw_max"],
+            "downweighted_fraction": (neg_p_clipped > 0.5).float().mean().detach(),
+            "effective_neg_weight_mean": neg_w.mean().detach(),
+            "effective_neg_weight_min": neg_w.min().detach(),
+            "max_fn_weight_current": torch.tensor(max_cap, device=z.device),
             "temperature": torch.tensor(self.temperature, device=z.device),
         }
+        out.update(diag)
+        out.update(reg)
+        return out

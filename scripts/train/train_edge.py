@@ -45,6 +45,7 @@ from src.utils import make_run_id, save_run_artifacts, set_seed
 from train_common import (
     base_step_metrics,
     build_val_loader,
+    compute_max_fn_weight_current,
     run_validation_dict,
     snapshot_cpu_state,
 )
@@ -64,9 +65,11 @@ def main(cfg: DictConfig) -> None:
     scorer = instantiate(cfg.model.scorer).to(device)
     full_model = nn.ModuleDict({"encoder": encoder, "head": head, "scorer": scorer})
 
-    # Build the loss WITHOUT the marker flag (it's a script-level concern).
+    # Build the loss WITHOUT the marker flag or the train-loop schedule
+    # (script-level concerns, not loss constructor args).
     loss_cfg = OmegaConf.to_container(cfg.loss, resolve=True)
     edge_aware = bool(loss_cfg.pop("edge_aware", True))
+    loss_cfg.pop("fn_schedule", None)
     loss_target = loss_cfg.pop("_target_")
     loss_fn = hydra.utils.get_class(loss_target)(**loss_cfg).to(device)
 
@@ -88,8 +91,14 @@ def main(cfg: DictConfig) -> None:
     val_every = cfg.train.get("val_every", 200)
     val_max_batches = cfg.train.get("val_max_batches", None)
     val_seed = int(cfg.run.seed) + 10000
-    lambda_pfn_reg = cfg.train.get("lambda_pfn_reg", 0.0)
+    lambda_pfn_reg = cfg.train.get("lambda_pfn_reg", 0.0)  # legacy term
     detach_scorer_edge = cfg.train.get("detach_scorer_edge", False)
+    static_max_fn_weight = float(cfg.loss.get("max_fn_weight", 1.0))
+    fn_schedule_cfg = (
+        OmegaConf.to_container(cfg.loss.fn_schedule, resolve=True)
+        if "fn_schedule" in cfg.loss else None
+    )
+    current_max_cap = {"val": static_max_fn_weight}
 
     def forward_batch(x: torch.Tensor):
         if edge_aware:
@@ -109,11 +118,14 @@ def main(cfg: DictConfig) -> None:
             edge_feats[:b] if (edge_aware and scorer.use_edge_features) else None
         )
         p_fn = scorer(z[:b], scorer_edge_arg)
-        out = loss_fn(z, p_fn, edge_feats if edge_aware else None)
-        pfn_reg = lambda_pfn_reg * p_fn.mean()
+        out = loss_fn(
+            z, p_fn, edge_feats if edge_aware else None,
+            max_fn_weight_override=current_max_cap["val"],
+        )
+        legacy_reg = lambda_pfn_reg * p_fn.mean()
         return {
             "loss": out["loss"],
-            "val_total": out["loss"] + pfn_reg,
+            "val_total": out["loss"] + out["pfn_reg_total"] + legacy_reg,
             "p_fn_at_cap_fraction": out["p_fn_at_cap_fraction"],
         }
 
@@ -133,6 +145,12 @@ def main(cfg: DictConfig) -> None:
     epoch = 0
     while step < cfg.train.max_steps:
         epoch += 1
+        sched_cap = compute_max_fn_weight_current(
+            epoch, fn_schedule_cfg, static_max_fn_weight
+        )
+        current_max_cap["val"] = (
+            sched_cap if sched_cap is not None else static_max_fn_weight
+        )
         for (v1, v2), _labels, _pids in train_loader:
             if step >= cfg.train.max_steps:
                 break
@@ -144,19 +162,21 @@ def main(cfg: DictConfig) -> None:
             scorer_edge_arg = (
                 edge_feats[:batch] if (edge_aware and scorer.use_edge_features) else None
             )
-            # z.detach(): scorer must not reshape main embeddings (SimCLR convention).
-            # edge_features NOT detached: H4 requires gradient flow from the scorer's
-            # p_fn decisions back through edge_fingerprint into the KAN projector
-            # weights. Set train.detach_scorer_edge=true for the ablation that
-            # isolates aux-loss-only training of edges from scorer-driven training.
+            # z detached locally for the SimCLR convention; edge_features
+            # stay live to preserve the H4 scorer->edge->KAN gradient path.
+            # detach_scorer_edge=true isolates the aux-loss-only edge path.
             if scorer_edge_arg is not None and detach_scorer_edge:
                 scorer_edge_arg = scorer_edge_arg.detach()
             p_fn = scorer(z[:batch].detach(), scorer_edge_arg)
 
-            out = loss_fn(z, p_fn, edge_feats if edge_aware else None)
+            out = loss_fn(
+                z, p_fn, edge_feats if edge_aware else None,
+                max_fn_weight_override=sched_cap,
+            )
             contrastive_loss = out["loss"]
-            p_fn_reg = lambda_pfn_reg * p_fn.mean()
-            total_loss = contrastive_loss + p_fn_reg
+            pfn_reg_total = out["pfn_reg_total"]
+            legacy_reg = lambda_pfn_reg * p_fn.mean()
+            total_loss = contrastive_loss + pfn_reg_total + legacy_reg
 
             optim.zero_grad()
             total_loss.backward()
@@ -166,7 +186,7 @@ def main(cfg: DictConfig) -> None:
 
             losses.append(float(contrastive_loss.item()))
             step_dict = base_step_metrics(step, scheduler.get_last_lr()[0], out, epoch=epoch)
-            step_dict["p_fn_reg_loss"] = float(p_fn_reg.detach())
+            step_dict["p_fn_reg_loss"] = float(legacy_reg.detach())
             step_dict["total_loss"] = float(total_loss.detach())
             head_alpha = getattr(head, "alpha", None)
             if head_alpha is not None:
@@ -179,11 +199,12 @@ def main(cfg: DictConfig) -> None:
                     f"fn={float(out['fn_loss']):.4f} "
                     f"edge_c={float(out['edge_contrastive_loss']):.4f} "
                     f"edge_a={float(out['edge_align_loss']):.4f} "
-                    f"p_fn_mean={float(out['p_fn_mean']):.4f} "
-                    f"p_fn_max={out['p_fn_max'].item():.4f} "
-                    f"p_fn_raw_max={out['p_fn_max_raw'].item():.4f} "
+                    f"raw_mean={out['p_fn_raw_mean'].item():.4f} "
+                    f"raw_max={out['p_fn_raw_max'].item():.4f} "
+                    f"raw_std={out['p_fn_raw_std'].item():.4f} "
                     f"at_cap={out['p_fn_at_cap_fraction'].item():.4f} "
-                    f"downweighted={out['downweighted_fraction'].item():.4f} "
+                    f"max_cap={out['max_fn_weight_current'].item():.3f} "
+                    f"pfn_reg={out['pfn_reg_total'].detach().item():.4f} "
                     f"lr={scheduler.get_last_lr()[0]:.2e}"
                 )
 

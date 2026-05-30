@@ -62,6 +62,7 @@ class EdgeAwareFNWeightedInfoNCELoss(nn.Module):
         lambda_edge: float = 0.0,
         tau_edge: float = 0.1,
         lambda_edge_align: float = 0.0,
+        pfn_regularization: Optional[dict] = None,
     ):
         super().__init__()
         if tau_edge <= 0:
@@ -75,6 +76,7 @@ class EdgeAwareFNWeightedInfoNCELoss(nn.Module):
             temperature=temperature,
             normalize_embeddings=normalize_embeddings,
             max_fn_weight=max_fn_weight,
+            pfn_regularization=pfn_regularization,
         )
         self.lambda_edge = float(lambda_edge)
         self.tau_edge = float(tau_edge)
@@ -120,6 +122,7 @@ class EdgeAwareFNWeightedInfoNCELoss(nn.Module):
         z: torch.Tensor,
         p_fn: torch.Tensor,
         edge_features: Optional[torch.Tensor] = None,
+        max_fn_weight_override: Optional[float] = None,
     ) -> dict[str, torch.Tensor]:
         needs_edges = self.lambda_edge > 0 or self.lambda_edge_align > 0
         if needs_edges and edge_features is None:
@@ -137,7 +140,7 @@ class EdgeAwareFNWeightedInfoNCELoss(nn.Module):
             if torch.isnan(edge_features).any() or not torch.isfinite(edge_features).all():
                 raise ValueError("edge_features contains NaN or inf.")
 
-        fn_out = self.fn_loss(z, p_fn)
+        fn_out = self.fn_loss(z, p_fn, max_fn_weight_override=max_fn_weight_override)
         fn_scalar = fn_out["loss"]
         device = fn_scalar.device
 
@@ -167,21 +170,23 @@ class EdgeAwareFNWeightedInfoNCELoss(nn.Module):
                 f"lambda_edge={self.lambda_edge}, lambda_edge_align={self.lambda_edge_align}."
             )
 
-        return {
+        # Pass through every fn_out diagnostic (including the new raw/clipped
+        # p_fn stats + pfn_reg_total). pfn_reg_total carries live grad — the
+        # train script adds it to the optimizer objective outside `loss`.
+        result = {
             "loss": total,
             "fn_loss": fn_scalar.detach(),
             "edge_contrastive_loss": edge_contrastive_loss.detach(),
             "edge_align_loss": edge_align_loss.detach(),
             "lambda_edge": torch.tensor(self.lambda_edge, device=device),
             "lambda_edge_align": torch.tensor(self.lambda_edge_align, device=device),
-            "p_fn_mean": fn_out["p_fn_mean"],
-            "p_fn_max": fn_out["p_fn_max"],
-            "p_fn_mean_raw": fn_out["p_fn_mean_raw"],
-            "p_fn_max_raw": fn_out["p_fn_max_raw"],
-            "p_fn_at_cap_fraction": fn_out["p_fn_at_cap_fraction"],
-            "downweighted_fraction": fn_out["downweighted_fraction"],
             "edge_pos_sim_mean": edge_pos_sim_mean,
             "edge_neg_sim_mean": edge_neg_sim_mean,
-            "temperature": fn_out["temperature"],
             "tau_edge": torch.tensor(self.tau_edge, device=device),
         }
+        # Skip the inner-loss scalar `loss` (we already added `fn_loss`).
+        for k, v in fn_out.items():
+            if k == "loss":
+                continue
+            result[k] = v
+        return result

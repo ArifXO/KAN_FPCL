@@ -58,13 +58,27 @@ def snapshot_cpu_state(model: torch.nn.Module) -> dict:
     return {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
 
 
+_PFN_DIAG_KEYS = (
+    # Saturation diagnostics emitted by FNWeightedInfoNCELoss /
+    # EdgeAwareFNWeightedInfoNCELoss (see src.losses.pfn_diagnostics).
+    "p_fn_raw_mean", "p_fn_raw_std", "p_fn_raw_min", "p_fn_raw_max",
+    "p_fn_clipped_mean", "p_fn_clipped_std", "p_fn_clipped_min", "p_fn_clipped_max",
+    "p_fn_at_cap_fraction", "p_fn_near_zero_fraction", "p_fn_entropy_mean",
+    "effective_neg_weight_mean", "effective_neg_weight_min",
+    "max_fn_weight_current",
+    # Regularization components
+    "loss_pfn_mean", "loss_pfn_cap", "loss_pfn_entropy",
+    "pfn_reg_total", "target_pfn_mean",
+)
+
+
 def base_step_metrics(step: int, lr: float, out: dict, epoch: int = 0) -> dict:
     """One per-step row from a loss dict; NaN for keys a loss does not emit.
 
     Single source of truth for the R7 logging keys shared by all three train
     scripts. ``out["loss"]`` carries grad, so it is detached before casting.
     """
-    return {
+    row = {
         "step": step,
         "epoch": epoch,
         "lr": lr,
@@ -81,6 +95,50 @@ def base_step_metrics(step: int, lr: float, out: dict, epoch: int = 0) -> dict:
         "total_loss": float(out.get("total_loss", float("nan"))),
         "alpha": float(out.get("alpha", float("nan"))),
     }
+    for k in _PFN_DIAG_KEYS:
+        v = out.get(k, float("nan"))
+        # pfn_reg_total carries live grad (caller backprops through it);
+        # detach before casting so float() does not warn.
+        if isinstance(v, torch.Tensor):
+            v = v.detach()
+        row[k] = float(v)
+    return row
+
+
+def compute_max_fn_weight_current(
+    epoch: int,
+    schedule_cfg: dict | None,
+    static_max_fn_weight: float,
+) -> float | None:
+    """Return the current FN cap given an optional warmup/ramp schedule.
+
+    Schedule dict shape (all optional)::
+
+        enabled: bool       # default False -> returns None (loss uses its own max_fn_weight)
+        warmup_epochs: int  # cap = max_fn_weight_start during this window
+        ramp_epochs: int    # linear ramp start -> end after warmup
+        max_fn_weight_start: float
+        max_fn_weight_end:   float  # default = static_max_fn_weight
+
+    ``epoch`` is 1-indexed (matches the train loops). When ``enabled=False``,
+    we return None and the loss keeps using its constructor-time cap (no
+    behavior change for legacy configs).
+    """
+    cfg = dict(schedule_cfg or {})
+    if not bool(cfg.get("enabled", False)):
+        return None
+    warmup = int(cfg.get("warmup_epochs", 0))
+    ramp = int(cfg.get("ramp_epochs", 0))
+    start = float(cfg.get("max_fn_weight_start", 0.0))
+    end = float(cfg.get("max_fn_weight_end", static_max_fn_weight))
+    e0 = max(0, epoch - 1)  # 0-indexed for the schedule
+    if e0 < warmup:
+        return start
+    progress = e0 - warmup
+    if ramp <= 0 or progress >= ramp:
+        return end
+    frac = progress / ramp
+    return start + frac * (end - start)
 
 
 def run_validation(

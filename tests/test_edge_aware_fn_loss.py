@@ -21,6 +21,7 @@ from src.models import EdgeAwarePairScorer
 
 
 _REQUIRED_KEYS = {
+    # Stage 7.5 schema (loss + edge components + back-compat p_fn summaries).
     "loss",
     "fn_loss",
     "edge_contrastive_loss",
@@ -37,6 +38,28 @@ _REQUIRED_KEYS = {
     "edge_neg_sim_mean",
     "temperature",
     "tau_edge",
+    # Pitfall #5 raw/clipped saturation diagnostics + scorer-similarity stats.
+    "pos_sim_mean",
+    "neg_sim_mean",
+    "p_fn_raw_mean",
+    "p_fn_raw_std",
+    "p_fn_raw_min",
+    "p_fn_raw_max",
+    "p_fn_clipped_mean",
+    "p_fn_clipped_std",
+    "p_fn_clipped_min",
+    "p_fn_clipped_max",
+    "p_fn_near_zero_fraction",
+    "p_fn_entropy_mean",
+    "effective_neg_weight_mean",
+    "effective_neg_weight_min",
+    "max_fn_weight_current",
+    # Saturation regularization components.
+    "loss_pfn_mean",
+    "loss_pfn_cap",
+    "loss_pfn_entropy",
+    "pfn_reg_total",
+    "target_pfn_mean",
 }
 
 

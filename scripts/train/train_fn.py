@@ -28,7 +28,7 @@ import hydra
 import torch
 import torch.nn as nn
 from hydra.utils import instantiate
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 
 from src.data import get_dataloader
 from src.utils import make_run_id, save_run_artifacts, set_seed
@@ -36,6 +36,7 @@ from src.utils import make_run_id, save_run_artifacts, set_seed
 from train_common import (
     base_step_metrics,
     build_val_loader,
+    compute_max_fn_weight_current,
     run_validation_dict,
     snapshot_cpu_state,
 )
@@ -49,7 +50,12 @@ def main(cfg: DictConfig) -> None:
     encoder = instantiate(cfg.model.encoder).to(device)
     head = instantiate(cfg.model.head).to(device)
     scorer = instantiate(cfg.model.scorer).to(device)
-    loss_fn = instantiate(cfg.loss).to(device)
+    # Pop fn_schedule before instantiating — it is consumed by the train
+    # loop, not by FNWeightedInfoNCELoss.__init__.
+    loss_cfg = OmegaConf.to_container(cfg.loss, resolve=True)
+    loss_cfg.pop("fn_schedule", None)
+    loss_target = loss_cfg.pop("_target_")
+    loss_fn = hydra.utils.get_class(loss_target)(**loss_cfg).to(device)
     full_model = nn.ModuleDict({"encoder": encoder, "head": head, "scorer": scorer})
 
     loaders = get_dataloader(cfg.data)
@@ -70,19 +76,26 @@ def main(cfg: DictConfig) -> None:
     val_every = cfg.train.get("val_every", 200)
     val_max_batches = cfg.train.get("val_max_batches", None)
     val_seed = int(cfg.run.seed) + 10000
-    lambda_pfn_reg = cfg.train.get("lambda_pfn_reg", 0.0)
+    lambda_pfn_reg = cfg.train.get("lambda_pfn_reg", 0.0)  # legacy term
+    static_max_fn_weight = float(cfg.loss.get("max_fn_weight", 1.0))
+    fn_schedule_cfg = (
+        OmegaConf.to_container(cfg.loss.fn_schedule, resolve=True)
+        if "fn_schedule" in cfg.loss else None
+    )
+
+    current_max_cap = {"val": static_max_fn_weight}  # closure-shared, updated per epoch
 
     def val_forward(v1: torch.Tensor, v2: torch.Tensor) -> dict:
-        # val_total adds the p_fn collapse penalty to the raw contrastive loss
-        # so a saturated scorer (p_fn->1, fn_loss->0) cannot win checkpoint
-        # selection by gaming the FN denominator.
+        # val_total = contrastive loss + pfn_reg_total + legacy collapse
+        # penalty, so a saturated scorer cannot win checkpoint selection by
+        # gaming the FN denominator.
         z = head(encoder(torch.cat([v1, v2], dim=0)))
         p_fn = scorer(z[: v1.shape[0]])
-        fn_out = loss_fn(z, p_fn)
-        pfn_reg = lambda_pfn_reg * p_fn.mean()
+        fn_out = loss_fn(z, p_fn, max_fn_weight_override=current_max_cap["val"])
+        legacy_reg = lambda_pfn_reg * p_fn.mean()
         return {
             "loss": fn_out["loss"],
-            "val_total": fn_out["loss"] + pfn_reg,
+            "val_total": fn_out["loss"] + fn_out["pfn_reg_total"] + legacy_reg,
             "p_fn_at_cap_fraction": fn_out["p_fn_at_cap_fraction"],
         }
 
@@ -102,6 +115,14 @@ def main(cfg: DictConfig) -> None:
     epoch = 0
     while step < cfg.train.max_steps:
         epoch += 1
+        # Schedule update — recomputed once per epoch. None falls through to
+        # the loss's constructor-time max_fn_weight (legacy behavior).
+        sched_cap = compute_max_fn_weight_current(
+            epoch, fn_schedule_cfg, static_max_fn_weight
+        )
+        current_max_cap["val"] = (
+            sched_cap if sched_cap is not None else static_max_fn_weight
+        )
         for (v1, v2), _labels, _pids in train_loader:
             if step >= cfg.train.max_steps:
                 break
@@ -109,12 +130,16 @@ def main(cfg: DictConfig) -> None:
             z = head(encoder(torch.cat([v1, v2], dim=0)))
 
             batch = v1.shape[0]
-            p_fn = scorer(z[:batch].detach())  # scorer trained via loss grad below
+            # Scorer detaches internally now (detach_inputs=True default for
+            # MLPPairScorer/KANPairScorer); .detach() here is redundant but
+            # cheap and keeps the call signature explicit for readers.
+            p_fn = scorer(z[:batch])
 
-            out = loss_fn(z, p_fn)
+            out = loss_fn(z, p_fn, max_fn_weight_override=sched_cap)
             contrastive_loss = out["loss"]
-            p_fn_reg = lambda_pfn_reg * p_fn.mean()
-            total_loss = contrastive_loss + p_fn_reg
+            pfn_reg_total = out["pfn_reg_total"]
+            legacy_reg = lambda_pfn_reg * p_fn.mean()
+            total_loss = contrastive_loss + pfn_reg_total + legacy_reg
 
             optim.zero_grad()
             total_loss.backward()
@@ -124,20 +149,19 @@ def main(cfg: DictConfig) -> None:
 
             losses.append(float(contrastive_loss.item()))
             step_dict = base_step_metrics(step, scheduler.get_last_lr()[0], out, epoch=epoch)
-            step_dict["p_fn_reg_loss"] = float(p_fn_reg.detach())
+            step_dict["p_fn_reg_loss"] = float(legacy_reg.detach())
             step_dict["total_loss"] = float(total_loss.detach())
             step_metrics.append(step_dict)
 
             if step % cfg.train.log_every == 0:
                 print(
                     f"[step {step}] loss={total_loss.item():.4f} "
-                    f"pos_sim={out['pos_sim_mean'].item():.4f} "
-                    f"neg_sim={out['neg_sim_mean'].item():.4f} "
-                    f"p_fn_mean={out['p_fn_mean'].item():.4f} "
-                    f"p_fn_max={out['p_fn_max'].item():.4f} "
-                    f"p_fn_raw_max={out['p_fn_max_raw'].item():.4f} "
+                    f"raw_mean={out['p_fn_raw_mean'].item():.4f} "
+                    f"raw_max={out['p_fn_raw_max'].item():.4f} "
+                    f"raw_std={out['p_fn_raw_std'].item():.4f} "
                     f"at_cap={out['p_fn_at_cap_fraction'].item():.4f} "
-                    f"downweighted={out['downweighted_fraction'].item():.4f} "
+                    f"max_cap={out['max_fn_weight_current'].item():.3f} "
+                    f"pfn_reg={out['pfn_reg_total'].detach().item():.4f} "
                     f"lr={scheduler.get_last_lr()[0]:.2e}"
                 )
 

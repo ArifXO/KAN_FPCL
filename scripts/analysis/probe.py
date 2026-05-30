@@ -50,6 +50,11 @@ _CSV_COLUMNS = [
     "per_class_auroc_linear_test_json",
     "n_classes_valid_test",
     "runtime_sec",
+    # Baseline-disambiguation metadata (Debiased CL / SupCon Oracle).
+    # ``oracle_labels_used`` records whether training-time ChestMNIST labels
+    # were used by the contrastive loss; ``true`` for supcon_oracle rows.
+    "loss_name", "baseline_family", "oracle_labels_used",
+    "positive_mode", "tau_plus", "temperature",
 ]
 
 
@@ -308,6 +313,25 @@ def main(cfg: DictConfig) -> None:
         for i, v in zip(valid_classes_test, probe_out_test["per_class_auroc"])
     })
 
+    # Derive baseline metadata from the checkpoint's loss config so
+    # Debiased CL / SupCon Oracle rows can be filtered without manually
+    # editing the probe meta block. Falls back to cfg.meta.* / "" when the
+    # checkpoint did not record a baseline metadata field.
+    ckpt_loss = ckpt_cfg.get("loss", {})
+    loss_name = ckpt_loss.get("name", cfg.meta.loss)
+    if loss_name == "supcon_oracle":
+        baseline_family = "oracle_label_aware_baseline"
+        oracle_labels_used = "true"
+    elif loss_name == "debiased":
+        baseline_family = "false_negative_aware_baseline"
+        oracle_labels_used = "false"
+    elif loss_name in ("fn_weighted", "edge_aware_fn"):
+        baseline_family = "false_negative_aware_method"
+        oracle_labels_used = "false"
+    else:  # infonce or unknown
+        baseline_family = "self_supervised_baseline"
+        oracle_labels_used = "false"
+
     row = {
         "run_id": run_id,
         "encoder": cfg.meta.encoder,
@@ -329,6 +353,12 @@ def main(cfg: DictConfig) -> None:
         "per_class_auroc_linear_test_json": per_class_test_json,
         "n_classes_valid_test": n_classes_valid_test,
         "runtime_sec": round(runtime, 2),
+        "loss_name": loss_name,
+        "baseline_family": baseline_family,
+        "oracle_labels_used": oracle_labels_used,
+        "positive_mode": str(ckpt_loss.get("positive_mode", "")),
+        "tau_plus": ckpt_loss.get("tau_plus", ""),
+        "temperature": ckpt_loss.get("temperature", ""),
     }
 
     csv_path = Path(cfg.probe.output_csv)

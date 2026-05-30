@@ -1,0 +1,14 @@
+# configs/loss/supcon_oracle_jaccard.yaml
+# Multi-label SupCon Oracle (Jaccard variant) — ORACLE/UPPER-BOUND baseline.
+# Positive pairs require Jaccard(L_i, L_j) > min_jaccard; Jaccard itself is
+# used as the (detached) positive weight in the loss average. Uses
+# ChestMNIST training labels — NOT a self-supervised method.
+
+_target_: src.losses.MultilabelSupConOracleLoss
+name: supcon_oracle
+temperature: 0.1
+normalize_embeddings: true
+positive_mode: jaccard
+min_jaccard: 0.0
+include_self_view_positive: true
+no_positive_policy: self_view_only

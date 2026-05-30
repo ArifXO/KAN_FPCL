@@ -13,6 +13,7 @@ reserved for Stage 10 ablations.
 
 from __future__ import annotations
 
+import math
 from typing import Optional
 
 import torch
@@ -22,6 +23,12 @@ import torch.nn.functional as F
 from .kan import FastKANLayer
 
 _ACTIVATIONS = {"relu": nn.ReLU, "gelu": nn.GELU, "silu": nn.SiLU}
+
+
+def _logit(p: float) -> float:
+    if not (0.0 < p < 1.0):
+        raise ValueError(f"init_pfn_prior must be in (0, 1), got {p}.")
+    return math.log(p / (1.0 - p))
 
 
 def _build_mlp(in_dim: int, hidden_dim: int, num_layers: int, act: str) -> nn.Sequential:
@@ -36,30 +43,16 @@ def _build_mlp(in_dim: int, hidden_dim: int, num_layers: int, act: str) -> nn.Se
 
 
 class EdgeAwarePairScorer(nn.Module):
-    """Pair scorer with handcrafted geometric features + optional KAN-edge channel.
+    """Pair scorer with handcrafted geometric features + optional edge channel.
 
-    Args:
-        input_dim: Embedding dim ``D`` of the projector output (z).
-        edge_dim: Width of the edge fingerprint (must be 256 — matches
-            :func:`src.losses.edge_features.edge_fingerprint`). Stored for
-            shape validation only; not used when ``use_edge_features=False``.
-        hidden_dim: Hidden width of the scorer head.
-        num_layers: Number of hidden layers (MLP) / single FastKAN layer
-            replaces them when ``scorer_type='kan'``.
-        activation: Activation name for the MLP head (``relu|gelu|silu``).
-        use_edge_features: When True, two extra scalar pair features
-            (``e_ik``, ``δ_ik``) are appended and ``forward`` requires
-            ``edge_features`` to be supplied.
-        scorer_type: ``'mlp'`` (Linear+activation stack) or ``'kan'``
-            (single FastKANLayer with ``base_linear=True``).
-        kan_num_centers: KAN RBF center count when ``scorer_type='kan'``.
-            Defaults to 4 to keep the param count near the MLP anchor.
+    Args: input_dim (D of z); edge_dim (256, matches edge_fingerprint);
+    hidden_dim, num_layers, activation (MLP head); use_edge_features (adds
+    [e_ik, δ_ik] features and requires edge_features at forward); scorer_type
+    ('mlp'|'kan'); kan_num_centers, kan_hidden_dim, kan_use_base_linear (KAN
+    parity knobs); init_pfn_prior (final-bias init); detach_inputs (severs
+    H4 path if True — default False, see __init__ comment).
 
-    Forward:
-        z_view1: ``[B, D]`` — single-view embeddings.
-        edge_features: ``[B, edge_dim]`` view-1 fingerprints, required iff
-            ``use_edge_features=True``.
-        Returns ``p_fn[B, B] ∈ [0, 1]``.
+    Forward(z_view1[B,D], edge_features[B,edge_dim]) -> p_fn[B,B] in [0,1].
     """
 
     def __init__(
@@ -74,6 +67,8 @@ class EdgeAwarePairScorer(nn.Module):
         kan_num_centers: int = 4,
         kan_hidden_dim: Optional[int] = None,
         kan_use_base_linear: bool = True,
+        init_pfn_prior: float | None = 0.05,
+        detach_inputs: bool = False,
     ):
         super().__init__()
         if input_dim <= 0:
@@ -99,6 +94,10 @@ class EdgeAwarePairScorer(nn.Module):
         self.num_layers = int(num_layers)
         self.use_edge_features = bool(use_edge_features)
         self.scorer_type = scorer_type
+        # DEVIATION (CLAUDE.md §5): default False, not True per the
+        # saturation spec — True would sever the H4 scorer->edge->KAN path
+        # validated by test_gradient_flows_through_edge_to_kan_weights.
+        self.detach_inputs = bool(detach_inputs)
 
         # Feature layout: [cos, L2, |z_i-z_k|(D), z_i*z_k(D)] (+ [e_ik, δ_ik] if edge).
         pair_feat_dim = 2 + 2 * self.input_dim + (2 if self.use_edge_features else 0)
@@ -111,14 +110,8 @@ class EdgeAwarePairScorer(nn.Module):
             self._head_kan: Optional[FastKANLayer] = None
             self._head_kan_out: Optional[nn.Linear] = None
         else:
-            # Single FastKAN layer pair_feat_dim -> kan_hidden_dim, then linear to 1.
-            # Knobs (kan_hidden_dim, kan_num_centers, kan_use_base_linear) exist
-            # because pair_feat_dim is large (~260), so the KAN layer's
-            # rbf_weight tensor (h*pair_feat_dim*centers) and optional base
-            # Linear (pair_feat_dim*h+h) easily blow past the MLP anchor's
-            # parameter count. Tune them for ±15 % parity (R1).
-            # FastKANLayer requires 2-D input, so forward() flattens
-            # [B,B,F] -> [B*B,F] before calling it.
+            # KAN knobs tune for R1 parity vs the MLP anchor; forward()
+            # flattens [B,B,F] -> [B*B,F] because FastKANLayer is 2-D only.
             kan_h = int(kan_hidden_dim) if kan_hidden_dim is not None else hidden_dim
             self._head_mlp = None
             self._head_kan = FastKANLayer(
@@ -130,6 +123,14 @@ class EdgeAwarePairScorer(nn.Module):
             )
             self._head_kan_out = nn.Linear(kan_h, 1)
             self._kan_h = kan_h
+
+        if init_pfn_prior is not None:
+            with torch.no_grad():
+                if scorer_type == "mlp":
+                    final_linear = self._head_mlp[-1]
+                else:
+                    final_linear = self._head_kan_out
+                final_linear.bias.fill_(_logit(float(init_pfn_prior)))
 
     def _pair_features(
         self, z: torch.Tensor, edge_features: Optional[torch.Tensor]
@@ -178,6 +179,11 @@ class EdgeAwarePairScorer(nn.Module):
                     f"edge_features must have shape [B={b}, edge_dim={self.edge_dim}], "
                     f"got {tuple(edge_features.shape)}."
                 )
+
+        if self.detach_inputs:
+            z_view1 = z_view1.detach()
+            if edge_features is not None:
+                edge_features = edge_features.detach()
 
         feats = self._pair_features(z_view1, edge_features)   # [B,B, pair_feat_dim]
         if self.scorer_type == "mlp":

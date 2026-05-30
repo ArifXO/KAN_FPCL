@@ -1,0 +1,70 @@
+# configs/experiment/debug_pfn_saturation.yaml
+# Short ChestMNIST training run for tuning the p_fn-saturation guards
+# (Pitfall #5 mitigations). Not a hypothesis-evidence run — use this to
+# pick reg/schedule hyperparams, then plug the winning values into the
+# full ablation configs.
+#
+# Recommended sweep (small grid — keep total runtime tractable):
+#
+#   python scripts/train/train_fn.py \\
+#     --config-name debug_pfn_saturation \\
+#     --multirun \\
+#     loss.pfn_regularization.target_mean=0.03,0.05,0.10 \\
+#     loss.pfn_regularization.lambda_mean=0.05,0.10,0.20 \\
+#     loss.fn_schedule.max_fn_weight_end=0.25,0.50 \\
+#     loss.fn_schedule.warmup_epochs=0,5
+#
+# Then for each run:
+#   python -m scripts.analysis.analyze_pfn_saturation \\
+#     --run-dir runs/checkpoints/debug_pfn_<id> --plot
+# and pick the config whose tail p_fn_at_cap_fraction stays < 0.10 and whose
+# p_fn_raw_std stays > 0.05 (no collapse to constant).
+
+defaults:
+  - /data: chestmnist
+  - /model: mlp_scorer
+  - /loss: fn_weighted_mlp
+  - _self_
+
+hydra:
+  searchpath:
+    - file://${oc.env:PROJECT_ROOT}/configs
+
+run:
+  name: debug_pfn
+  output_root: runs/checkpoints
+  seed: 42
+  deterministic: false
+  device: cuda
+
+train:
+  max_steps: 600          # ~30 epochs at chestmnist bs=128; enough to see saturation onset
+  log_every: 25
+  lr: 0.001
+  lr_min: 1.0e-6
+  grad_clip: 1.0
+  val_every: 100
+  val_max_batches: 4
+  lambda_pfn_reg: 0.0     # use the new in-loss regularization, not the legacy term
+
+data:
+  batch_size: 128
+  num_workers: 0
+  download: false
+
+# Overrides on top of /loss/fn_weighted_mlp.yaml: shorter schedule because
+# the budget is small. Sweep these via --multirun (see header).
+loss:
+  pfn_regularization:
+    enabled: true
+    target_mean: 0.05
+    lambda_mean: 0.1
+    lambda_cap: 0.1
+    lambda_entropy: 0.0
+    cap_margin: 0.98
+  fn_schedule:
+    enabled: true
+    warmup_epochs: 2
+    ramp_epochs: 4
+    max_fn_weight_start: 0.0
+    max_fn_weight_end: 0.5

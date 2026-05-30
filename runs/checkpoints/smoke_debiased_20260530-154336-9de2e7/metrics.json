@@ -1,0 +1,20 @@
+{
+  "train_loss_final": 1.7638075351715088,
+  "train_loss_curve": [
+    1.933639407157898,
+    1.7638075351715088
+  ],
+  "val_loss_curve": [
+    {
+      "step": 0,
+      "val_loss": 1.767675757408142
+    }
+  ],
+  "best_val_loss": 1.767675757408142,
+  "best_val_step": 0,
+  "train_time_sec": 0.4709970951080322,
+  "steps": 2,
+  "total_epochs": 1,
+  "run_id": "20260530-154336-9de2e7",
+  "seed": 42
+}

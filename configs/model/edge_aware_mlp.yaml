@@ -37,3 +37,8 @@ scorer:
   activation: relu
   use_edge_features: true
   scorer_type: mlp
+  # Pitfall #5: bias-init the final sigmoid to a low prior.
+  init_pfn_prior: 0.05
+  # H4: keep detach_inputs=false here so the scorer->edge->KAN gradient
+  # path remains alive. Set true ONLY for the H4-isolation ablation.
+  detach_inputs: false

@@ -13,3 +13,24 @@ normalize_embeddings: true
 # scorer from completely removing negatives (Pitfall #3: p_FN collapse).
 # Setting this to 1.0 allows full removal and risks denominator collapse.
 max_fn_weight: 0.5
+
+# Pitfall #5 saturation regularization (raw-p_fn penalties; see
+# src.losses.pfn_diagnostics.pfn_regularization). Defaults are conservative;
+# set lambda_mean=0 lambda_cap=0 to recover Stage-6-pre-fix behavior.
+pfn_regularization:
+  enabled: true
+  target_mean: 0.05        # prior expectation on the FN rate per pair
+  lambda_mean: 0.1         # weight on (mean_p_fn - target)^2
+  lambda_cap: 0.1          # weight on relu(p_fn/max_cap - cap_margin)^2
+  lambda_entropy: 0.0      # logged-only by default; enable to fight collapse
+  cap_margin: 0.98
+
+# Per-epoch warmup/ramp on the effective max_fn_weight. With warmup_epochs=5
+# the loss runs as plain InfoNCE for the first 5 epochs (max_fn_weight=0)
+# and then linearly ramps to max_fn_weight_end over `ramp_epochs`.
+fn_schedule:
+  enabled: true
+  warmup_epochs: 5
+  ramp_epochs: 10
+  max_fn_weight_start: 0.0
+  max_fn_weight_end: 0.5

@@ -38,3 +38,5 @@ scorer:
   kan_hidden_dim: 4
   kan_num_centers: 3
   kan_use_base_linear: true
+  init_pfn_prior: 0.05       # Pitfall #5: low-prior bias init
+  detach_inputs: false       # H4: keep scorer->edge->KAN grad path live

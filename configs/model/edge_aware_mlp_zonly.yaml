@@ -30,3 +30,5 @@ scorer:
   activation: relu
   use_edge_features: false     # <-- TRUE Z-ONLY: no edge features
   scorer_type: mlp
+  init_pfn_prior: 0.05         # Pitfall #5: low-prior bias init
+  detach_inputs: true          # no H4 path to preserve in the z-only control

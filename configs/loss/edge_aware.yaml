@@ -14,4 +14,22 @@ lambda_edge: 0.0
 tau_edge: 0.1
 lambda_edge_align: 0.0
 
+# Pitfall #5 saturation regularization (forwarded to the inner FN loss).
+pfn_regularization:
+  enabled: true
+  target_mean: 0.05
+  lambda_mean: 0.1
+  lambda_cap: 0.1
+  lambda_entropy: 0.0
+  cap_margin: 0.98
+
+# Warmup/ramp schedule on max_fn_weight. With warmup_epochs=5 the FN
+# downweighting is OFF (InfoNCE-equivalent) for the first 5 epochs.
+fn_schedule:
+  enabled: true
+  warmup_epochs: 5
+  ramp_epochs: 10
+  max_fn_weight_start: 0.0
+  max_fn_weight_end: 0.5
+
 edge_aware: true

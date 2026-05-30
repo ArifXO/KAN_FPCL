@@ -1,0 +1,23 @@
+{
+  "train_loss_final": 2.510385274887085,
+  "train_loss_curve": [
+    1.6371324062347412,
+    2.510385274887085
+  ],
+  "train_loss_type": "contrastive",
+  "val_loss_curve": [
+    {
+      "step": 0,
+      "val_loss": 1.7281475067138672,
+      "val_total": 1.7281475067138672
+    }
+  ],
+  "best_val_loss": 1.7281475067138672,
+  "best_val_total": 1.7281475067138672,
+  "best_val_step": 0,
+  "train_time_sec": 0.43723440170288086,
+  "steps": 2,
+  "total_epochs": 1,
+  "run_id": "20260530-142500-3f922f",
+  "seed": 42
+}

@@ -80,7 +80,10 @@ def test_input_dim_mismatch_raises():
 
 
 def test_gradient_flows_to_input():
-    scorer = MLPPairScorer(input_dim=8, hidden_dim=16, num_layers=2)
+    # detach_inputs=False here so we can verify the underlying op is
+    # differentiable wrt z. The default (True) deliberately severs this
+    # path in train_fn.py to keep scorer gradients off the encoder.
+    scorer = MLPPairScorer(input_dim=8, hidden_dim=16, num_layers=2, detach_inputs=False)
     z = torch.randn(4, 8, requires_grad=True)
     p = scorer(z)
     p.sum().backward()
@@ -89,7 +92,35 @@ def test_gradient_flows_to_input():
     assert z.grad.abs().sum() > 0
 
 
+def test_detach_inputs_blocks_gradient():
+    """detach_inputs=True is the deployment default — z must NOT receive grad."""
+    scorer = MLPPairScorer(input_dim=8, hidden_dim=16, num_layers=2, detach_inputs=True)
+    z = torch.randn(4, 8, requires_grad=True)
+    scorer(z).sum().backward()
+    assert z.grad is None or float(z.grad.abs().sum()) == 0.0
+
+
+def test_init_pfn_prior_initial_mean():
+    """R-D acceptance: initial mean p_fn ≈ init_pfn_prior on random z."""
+    torch.manual_seed(0)
+    for prior in (0.05, 0.1, 0.2):
+        scorer = MLPPairScorer(input_dim=32, hidden_dim=16, init_pfn_prior=prior)
+        z = torch.randn(64, 32)
+        p = scorer(z)
+        assert abs(p.mean().item() - prior) < 0.05, (
+            f"prior={prior} expected mean ≈ {prior}, got {p.mean().item():.4f}"
+        )
+
+
+def test_init_pfn_prior_invalid_raises():
+    with pytest.raises(ValueError, match="init_pfn_prior must be in"):
+        MLPPairScorer(input_dim=8, init_pfn_prior=0.0)
+    with pytest.raises(ValueError, match="init_pfn_prior must be in"):
+        MLPPairScorer(input_dim=8, init_pfn_prior=1.0)
+
+
 def test_gradient_flows_to_parameters():
+    # Scorer params must always get grad; works regardless of detach_inputs.
     scorer = MLPPairScorer(input_dim=8, hidden_dim=16, num_layers=2)
     z = torch.randn(4, 8)
     scorer(z).sum().backward()

@@ -20,3 +20,9 @@ scorer:
   input_dim: 128
   hidden_dim: 32
   num_layers: 2
+  # Pitfall #5: initialise final-layer bias to logit(0.05) so mean p_fn
+  # starts near 0.05 instead of the saturation-prone 0.5.
+  init_pfn_prior: 0.05
+  # Detach z at the scorer boundary so scorer gradients cannot reshape the
+  # encoder/projector toward easy-to-downweight features.
+  detach_inputs: true

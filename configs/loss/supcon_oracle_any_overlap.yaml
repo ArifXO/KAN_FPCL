@@ -1,0 +1,13 @@
+# configs/loss/supcon_oracle_any_overlap.yaml
+# Multi-label SupCon Oracle — ORACLE/UPPER-BOUND baseline.
+# Uses ChestMNIST training labels during contrastive pre-training to mark
+# any pair sharing >= 1 positive label as a positive. NOT a self-supervised
+# method; use as a label-aware ceiling against InfoNCE / Debiased / KAN-FPCL.
+
+_target_: src.losses.MultilabelSupConOracleLoss
+name: supcon_oracle
+temperature: 0.1
+normalize_embeddings: true
+positive_mode: any_overlap
+include_self_view_positive: true
+no_positive_policy: self_view_only

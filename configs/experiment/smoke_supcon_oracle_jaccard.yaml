@@ -1,0 +1,32 @@
+# configs/experiment/smoke_supcon_oracle_jaccard.yaml — pipeline smoke.
+
+defaults:
+  - /data: chestmnist
+  - /model: mlp_baseline
+  - /loss: supcon_oracle_jaccard
+  - _self_
+
+hydra:
+  searchpath:
+    - file://${oc.env:PROJECT_ROOT}/configs
+
+run:
+  name: smoke_supcon_oracle_jaccard
+  output_root: runs/checkpoints
+  seed: 42
+  deterministic: false
+  device: cpu
+
+train:
+  max_steps: 2
+  log_every: 1
+  lr: 0.001
+  lr_min: 1.0e-6
+  grad_clip: 1.0
+  val_every: 2
+  val_max_batches: 1
+
+data:
+  batch_size: 4
+  num_workers: 0
+  download: false

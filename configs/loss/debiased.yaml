@@ -1,0 +1,14 @@
+# configs/loss/debiased.yaml
+# Debiased Contrastive Learning (Chuang et al. 2020) — label-free baseline.
+# Corrects the InfoNCE assumption that all non-positive samples are true
+# negatives by subtracting an estimate of the positive class mass.
+#
+# name is informational metadata for the train script / probe CSV; it is
+# popped before the loss is instantiated so it is not passed as a kwarg.
+
+_target_: src.losses.DebiasedContrastiveLoss
+name: debiased
+temperature: 0.5
+tau_plus: 0.1
+normalize_embeddings: true
+estimator_clip_min: 1.0e-8
