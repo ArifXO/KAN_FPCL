@@ -1,0 +1,86 @@
+data:
+  _target_: src.data.ChestMNISTDataset
+  name: chestmnist
+  size: 28
+  batch_size: 256
+  num_workers: 4
+  pin_memory: true
+  download: false
+  split_seed: 42
+  normalize:
+    mean:
+    - 0.5
+    std:
+    - 0.5
+  augmentation:
+    crop_scale_min: 0.6
+    crop_scale_max: 1.0
+    rotation_degrees: 15
+    brightness: 0.3
+    contrast: 0.3
+    horizontal_flip_prob: 0.5
+model:
+  encoder:
+    _target_: src.models.ResNet18Encoder
+    pretrained: false
+  head:
+    _target_: src.models.kan.FastKANProjector
+    input_dim: 512
+    hidden_dim: 64
+    output_dim: 128
+    num_centers: 8
+    grid_min: -2.0
+    grid_max: 2.0
+    use_base_linear: true
+    base_activation: silu
+    rbf_init_scale: 0.1
+    normalize: true
+  scorer:
+    _target_: src.models.EdgeAwarePairScorer
+    input_dim: 128
+    edge_dim: 256
+    hidden_dim: 16
+    num_layers: 2
+    activation: relu
+    use_edge_features: false
+    scorer_type: mlp
+    init_pfn_prior: 0.05
+    detach_inputs: true
+loss:
+  _target_: src.losses.EdgeAwareFNWeightedInfoNCELoss
+  name: edge_aware_fn
+  temperature: 0.1
+  normalize_embeddings: true
+  max_fn_weight: 0.5
+  lambda_edge: 0.0
+  tau_edge: 0.1
+  lambda_edge_align: 0.0
+  pfn_regularization:
+    enabled: true
+    target_mean: 0.05
+    lambda_mean: 0.1
+    lambda_cap: 0.1
+    lambda_entropy: 0.0
+    cap_margin: 0.98
+  fn_schedule:
+    enabled: true
+    warmup_epochs: 5
+    ramp_epochs: 10
+    max_fn_weight_start: 0.0
+    max_fn_weight_end: 0.5
+  edge_aware: true
+run:
+  name: zonly_fn_s42
+  output_root: runs/ablation/h4_edge_signal
+  seed: 42
+  deterministic: false
+  device: cuda
+train:
+  max_steps: 10000
+  log_every: 100
+  lr: 0.0003
+  lr_min: 1.0e-06
+  grad_clip: 1.0
+  val_every: 500
+  val_max_batches: null
+  lambda_pfn_reg: 0.01

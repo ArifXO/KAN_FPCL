@@ -289,6 +289,7 @@ def _build_tables(df: pd.DataFrame, per_class_cols: tuple[str, ...]) -> dict[str
     if not h1.empty:
         agg = {
             "head": ("head", "first"),
+            "loss": ("loss", "first"),
             "params_total": ("params_total", _fmt_params),
             "n_seeds": ("seed", "nunique"),
             "macro_auroc": ("macro_auroc", _auroc),
@@ -331,6 +332,7 @@ def _build_tables(df: pd.DataFrame, per_class_cols: tuple[str, ...]) -> dict[str
             h3.groupby("cell_id", observed=True)
             .agg(
                 head=("head", "first"),
+                loss=("loss", "first"),
                 scorer=("scorer", "first"),
                 params_total=("params_total", _fmt_params),
                 n_seeds=("seed", "nunique"),
@@ -349,6 +351,7 @@ def _build_tables(df: pd.DataFrame, per_class_cols: tuple[str, ...]) -> dict[str
         tables["table_h4.md"] = (
             h4.groupby("cell_id", observed=True)
             .agg(
+                loss=("loss", "first"),
                 scorer=("scorer", "first"),
                 lambda_edge=("lambda_edge", "first"),
                 lambda_edge_align=("lambda_edge_align", "first"),
