@@ -73,6 +73,8 @@ def _parse_args() -> argparse.Namespace:
                    help="Also copy generated tables into reports/tables/ for commit.")
     p.add_argument("--publish-dir", default="reports/tables",
                    help="Destination for --publish (default: reports/tables).")
+    p.add_argument("--runs-root", default="runs/ablation",
+                   help="Root containing ablation run directories with metrics.json.")
     p.add_argument("--include-smoke", action="store_true", help="Keep smoke_* rows.")
     p.add_argument("--include-failed", action="store_true", help="Keep FAILED rows.")
     return p.parse_args()
@@ -199,6 +201,59 @@ def _fmt_params(values: pd.Series) -> str:
     return _fmt_metric(vals, digits=0)
 
 
+def _fmt_loss(values: pd.Series) -> str:
+    return _fmt_metric(values, digits=4)
+
+
+def _last_val_loss(metrics: dict) -> float:
+    curve = metrics.get("val_loss_curve", [])
+    if not curve:
+        return float("nan")
+    last = curve[-1]
+    if isinstance(last, dict):
+        return float(last.get("val_loss", float("nan")))
+    return float("nan")
+
+
+def _load_loss_metrics(row: pd.Series, runs_root: Path) -> dict[str, float]:
+    """Find a row's run directory and return final train/val loss metrics."""
+    cell_id = str(row["cell_id"])
+    seed = int(row["seed"])
+    pattern = f"{cell_id}_s{seed}_*/metrics.json"
+    candidates = sorted(
+        runs_root.glob(f"**/{pattern}"),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
+    if not candidates:
+        return {
+            "final_train_loss": float("nan"),
+            "final_val_loss": float("nan"),
+            "best_val_loss": float("nan"),
+        }
+    with open(candidates[0], "r", encoding="utf-8") as f:
+        metrics = json.load(f)
+    return {
+        "final_train_loss": float(metrics.get("train_loss_final", float("nan"))),
+        "final_val_loss": _last_val_loss(metrics),
+        "best_val_loss": float(metrics.get("best_val_loss", float("nan"))),
+    }
+
+
+def _attach_loss_metrics(df: pd.DataFrame, runs_root: Path) -> pd.DataFrame:
+    out = df.copy()
+    loaded = [_load_loss_metrics(row, runs_root) for _, row in out.iterrows()]
+    for col in ("final_train_loss", "final_val_loss", "best_val_loss"):
+        if col not in out.columns:
+            out[col] = [item[col] for item in loaded]
+        else:
+            existing = pd.to_numeric(out[col], errors="coerce")
+            fallback = pd.Series([item[col] for item in loaded], index=out.index)
+            out[col] = existing.fillna(fallback)
+        out[col] = pd.to_numeric(out[col], errors="coerce")
+    return out
+
+
 def _seed_count(values: pd.Series) -> int:
     return int(values.dropna().nunique())
 
@@ -292,6 +347,9 @@ def _build_tables(df: pd.DataFrame, per_class_cols: tuple[str, ...]) -> dict[str
             "loss": ("loss", "first"),
             "params_total": ("params_total", _fmt_params),
             "n_seeds": ("seed", "nunique"),
+            "final_train_loss": ("final_train_loss", _fmt_loss),
+            "final_val_loss": ("final_val_loss", _fmt_loss),
+            "best_val_loss": ("best_val_loss", _fmt_loss),
             "macro_auroc": ("macro_auroc", _auroc),
             "alignment": ("alignment", _auroc),
             "uniformity": ("uniformity", _auroc),
@@ -314,6 +372,9 @@ def _build_tables(df: pd.DataFrame, per_class_cols: tuple[str, ...]) -> dict[str
                 loss=("loss", "first"),
                 scorer=("scorer", "first"),
                 n_seeds=("seed", "nunique"),
+                final_train_loss=("final_train_loss", _fmt_loss),
+                final_val_loss=("final_val_loss", _fmt_loss),
+                best_val_loss=("best_val_loss", _fmt_loss),
                 macro_auroc=("macro_auroc", _auroc),
                 rare_disease_auroc=(rare_src, _auroc),
                 mAP=("mAP", _auroc),
@@ -336,6 +397,9 @@ def _build_tables(df: pd.DataFrame, per_class_cols: tuple[str, ...]) -> dict[str
                 scorer=("scorer", "first"),
                 params_total=("params_total", _fmt_params),
                 n_seeds=("seed", "nunique"),
+                final_train_loss=("final_train_loss", _fmt_loss),
+                final_val_loss=("final_val_loss", _fmt_loss),
+                best_val_loss=("best_val_loss", _fmt_loss),
                 macro_auroc=("macro_auroc", _auroc),
                 mAP=("mAP", _auroc),
             )
@@ -356,6 +420,9 @@ def _build_tables(df: pd.DataFrame, per_class_cols: tuple[str, ...]) -> dict[str
                 lambda_edge=("lambda_edge", "first"),
                 lambda_edge_align=("lambda_edge_align", "first"),
                 n_seeds=("seed", "nunique"),
+                final_train_loss=("final_train_loss", _fmt_loss),
+                final_val_loss=("final_val_loss", _fmt_loss),
+                best_val_loss=("best_val_loss", _fmt_loss),
                 macro_auroc=("macro_auroc", _auroc),
                 rare_disease_auroc=(rare_src, _auroc),
                 mAP=("mAP", _auroc),
@@ -435,6 +502,10 @@ def main() -> None:
     raw = _read_ablation(in_path)
     split = _resolve_split(raw, args.split)
     df = _prepare(raw, args.include_smoke, args.include_failed, _metric_aliases(split))
+    runs_root = Path(args.runs_root)
+    if not runs_root.is_absolute():
+        runs_root = PROJECT_ROOT / runs_root
+    df = _attach_loss_metrics(df, runs_root)
     per_class_cols = _per_class_cols(df, split)
     tables = _build_tables(df, per_class_cols)
     split_tag = "test split" if split == "test" else "VAL split (biased)"
