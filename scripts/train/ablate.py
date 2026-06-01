@@ -66,15 +66,29 @@ def _append_row(csv_path: Path, row: dict) -> None:
 
 
 def _run(cmd: list[str], cwd: Path) -> str:
-    proc = subprocess.run(
-        cmd, capture_output=True, text=True, cwd=cwd, env=os.environ.copy()
+    print(f"[ablate] running: {' '.join(cmd)}", flush=True)
+    proc = subprocess.Popen(
+        cmd,
+        cwd=cwd,
+        env=os.environ.copy(),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
     )
-    if proc.returncode != 0:
+    output: list[str] = []
+    assert proc.stdout is not None
+    for line in proc.stdout:
+        print(line, end="", flush=True)
+        output.append(line)
+    returncode = proc.wait()
+    stdout = "".join(output)
+    if returncode != 0:
         raise RuntimeError(
-            f"Command failed (exit {proc.returncode}): {' '.join(cmd)}\n"
-            f"--- stdout ---\n{proc.stdout}\n--- stderr ---\n{proc.stderr}"
+            f"Command failed (exit {returncode}): {' '.join(cmd)}\n"
+            f"--- output ---\n{stdout}"
         )
-    return proc.stdout
+    return stdout
 
 
 def _find_run_dir(stdout: str) -> Path:

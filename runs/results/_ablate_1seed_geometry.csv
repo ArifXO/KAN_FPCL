@@ -1,0 +1,16 @@
+run_id,encoder,head,loss,seed,alignment,uniformity,effective_rank,per_dim_std_mean,offdiag_covariance,dataset
+mlp_infonce_s42_20260531-142608-4238e6,resnet18,mlp,infonce,42,0.2204,-3.886129,116.945137,0.088193,0.000418,chestmnist
+kan_infonce_s42_20260531-144241-326002,resnet18,fastkan,infonce,42,0.20782,-3.76638,45.485085,0.088012,0.000996,chestmnist
+reskan_infonce_s42_20260531-145901-a0bc28,resnet18,residual_fastkan,infonce,42,0.226509,-3.884634,116.766273,0.088173,0.000421,chestmnist
+kan_wide_infonce_s42_20260531-151523-8d9009,resnet18,fastkan_wide,infonce,42,0.22236,-3.826214,73.551689,0.088135,0.000766,chestmnist
+mlp_fn_mlp_s42_20260531-152911-0c5d94,resnet18,mlp,fn_weighted,42,0.222556,-3.87633,115.304642,0.088118,0.000442,chestmnist
+mlp_fn_kan_s42_20260531-155023-37ac13,resnet18,mlp,fn_weighted,42,0.216934,-3.87987,115.426659,0.088144,0.000439,chestmnist
+kan_fn_kan_s42_20260531-161146-3bc3ec,resnet18,fastkan,fn_weighted,42,0.206208,-3.768206,46.039227,0.087988,0.000989,chestmnist
+edge_scorer_no_aux_s42_20260531-162940-19fe47,resnet18,fastkan,edge_aware_fn,42,0.203095,-3.781027,49.451405,0.087996,0.000936,chestmnist
+edge_contrastive_s42_20260531-164741-a1d30c,resnet18,fastkan,edge_aware_fn,42,0.233481,-3.845291,102.845253,0.088129,0.000667,chestmnist
+edge_align_s42_20260531-170537-05d33f,resnet18,fastkan,edge_aware_fn,42,0.206302,-3.790588,68.745026,0.088056,0.000912,chestmnist
+zonly_fn_s42_20260531-172405-bbbcab,resnet18,fastkan,edge_aware_fn,42,0.204905,-3.771815,46.548336,0.088,0.000982,chestmnist
+edge_contrastive_kan_s42_20260531-174426-979b0f,resnet18,fastkan,edge_aware_fn,42,0.23586,-3.851803,104.285706,0.088154,0.000649,chestmnist
+debiased_s42_20260531-175810-f7cc08,resnet18,mlp,debiased,42,0.099064,-3.596877,56.629284,0.088102,0.001064,chestmnist
+supcon_oracle_any_overlap_s42_20260531-181157-fbc19a,resnet18,mlp,supcon_oracle,42,0.274828,-3.072498,118.633583,0.078983,0.000309,chestmnist
+supcon_oracle_jaccard_s42_20260531-182541-0af8a0,resnet18,mlp,supcon_oracle,42,0.27145,-3.098852,118.875771,0.07915,0.000295,chestmnist
