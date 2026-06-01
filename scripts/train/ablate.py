@@ -15,6 +15,7 @@ merges the per-step CSV rows.
 from __future__ import annotations
 
 import csv
+import json
 import os
 import re
 import subprocess
@@ -32,7 +33,8 @@ from omegaconf import DictConfig
 
 _COLUMNS = [
     "cell_id", "head", "loss", "scorer", "lambda_edge", "lambda_edge_align",
-    "dataset", "seed", "params_total", "params_scorer", "macro_auroc_linear", "macro_auroc_knn",
+    "dataset", "seed", "params_total", "params_scorer", "final_loss", "best_loss",
+    "macro_auroc_linear", "macro_auroc_knn",
     "mAP", "per_class_auroc_linear_json",
     # Test-split metrics: model_best.pt is selected on val, so val numbers are
     # optimistically biased. Carry the test columns probe.py emits so downstream
@@ -93,6 +95,18 @@ def _last_csv_row(csv_path: Path) -> dict[str, str]:
     if not rows:
         raise RuntimeError(f"CSV {csv_path} has a header but no data rows.")
     return rows[-1]
+
+
+def _loss_metrics(ckpt_dir: Path) -> dict[str, object]:
+    metrics_path = ckpt_dir / "metrics.json"
+    if not metrics_path.exists():
+        raise FileNotFoundError(f"Expected train metrics not produced: {metrics_path}")
+    with open(metrics_path, "r") as f:
+        metrics = json.load(f)
+    return {
+        "final_loss": metrics.get("train_loss_final", ""),
+        "best_loss": metrics.get("best_val_loss", ""),
+    }
 
 
 _HYPOTHESIS_DIR = {
@@ -188,11 +202,14 @@ def _run_cell(
     t0 = time.time()
     try:
         ckpt_dir = _train(cell, seed, output_root, project_root, global_overrides)
+        loss_row = _loss_metrics(ckpt_dir)
         probe_row = _probe(ckpt_dir, cell, seed, probe_csv, project_root)
         geom_row = _geometry(ckpt_dir, cell, seed, geom_csv, project_root)
         row.update({
             "params_total": probe_row.get("params_total", ""),
             "params_scorer": probe_row.get("params_scorer", "0"),
+            "final_loss": loss_row.get("final_loss", ""),
+            "best_loss": loss_row.get("best_loss", ""),
             "macro_auroc_linear": probe_row.get("macro_auroc_linear", ""),
             "macro_auroc_knn": probe_row.get("macro_auroc_knn", ""),
             "mAP": probe_row.get("mAP", ""),

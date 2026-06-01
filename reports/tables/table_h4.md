@@ -1,8 +1,8 @@
-# H4 Edge-aware Scorer Ablation (VAL split (biased))
+# H4 Edge-aware Scorer Ablation (test split)
 
 | cell_id            | scorer    | lambda_edge | lambda_edge_align | n_seeds | macro_auroc  | rare_disease_auroc | mAP          |
 | ------------------ | --------- | ----------- | ----------------- | ------- | ------------ | ------------------ | ------------ |
-| zonly_fn           | mlp_zonly | 0.0         | 0.0               | 1       | 0.6808 (n=1) | 0.6868 (n=1)       | 0.1032 (n=1) |
-| edge_scorer_no_aux | edge_mlp  | 0.0         | 0.0               | 1       | 0.6844 (n=1) | 0.6538 (n=1)       | 0.1076 (n=1) |
-| edge_contrastive   | edge_mlp  | 0.05        | 0.0               | 1       | 0.6806 (n=1) | 0.6719 (n=1)       | 0.1061 (n=1) |
-| edge_align         | edge_mlp  | 0.0         | 0.05              | 1       | 0.6867 (n=1) | 0.6771 (n=1)       | 0.1054 (n=1) |
+| zonly_fn           | mlp_zonly | 0.0         | 0.0               | 1       | 0.6711 (n=1) | 0.6785 (n=1)       | 0.1026 (n=1) |
+| edge_scorer_no_aux | edge_mlp  | 0.0         | 0.0               | 1       | 0.6744 (n=1) | 0.6781 (n=1)       | 0.1074 (n=1) |
+| edge_contrastive   | edge_mlp  | 0.05        | 0.0               | 1       | 0.6748 (n=1) | 0.6747 (n=1)       | 0.1068 (n=1) |
+| edge_align         | edge_mlp  | 0.0         | 0.05              | 1       | 0.6839 (n=1) | 0.6928 (n=1)       | 0.1045 (n=1) |

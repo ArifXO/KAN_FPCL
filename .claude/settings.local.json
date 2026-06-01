@@ -111,7 +111,9 @@
       "PowerShell(Get-Process *)",
       "Bash(nvidia-smi --query-gpu=utilization.gpu,memory.used,memory.total --format=csv)",
       "Bash(powershell -NoProfile -Command 'Get-Process python -ErrorAction SilentlyContinue | Sort-Object StartTime | Select-Object Id, @{N='\\\\''CPU_s'\\\\'';E={[math]::Round\\($_.CPU,0\\)}}, @{N='\\\\''Mem_MB'\\\\'';E={[math]::Round\\($_.WS/1MB,0\\)}}, StartTime | Format-Table -AutoSize')",
-      "Bash(nvidia-smi --query-gpu=utilization.gpu,memory.used --format=csv,noheader)"
+      "Bash(nvidia-smi --query-gpu=utilization.gpu,memory.used --format=csv,noheader)",
+      "Bash(mkdir -p runs/ablation/h1_architecture runs/ablation/h2_fn_weighted runs/ablation/h3_kan_scorer runs/ablation/h4_edge_signal runs/ablation/baselines)",
+      "Bash(touch runs/ablation/h1_architecture/.gitkeep runs/ablation/h2_fn_weighted/.gitkeep runs/ablation/h3_kan_scorer/.gitkeep runs/ablation/h4_edge_signal/.gitkeep runs/ablation/baselines/.gitkeep)"
     ]
   }
 }

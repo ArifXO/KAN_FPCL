@@ -1,0 +1,11 @@
+2026-06-01 14:44:36 +06:00 | Stage 10 | experiment-auditor | PASS
+Files checked: scripts/train/ablate.py; scripts/analysis/make_paper_tables.py; runs/results/ablation_1seed_master.csv; reports/tables/table_ablation_master.md
+Checks:
+- R6 Hydra: PASS. scripts/train/ablate.py remains decorated with @hydra.main(config_path="../../configs/experiment", config_name="ablation").
+- R8 artifacts: PASS. ablate.py now carries final_loss and best_loss from each run's metrics.json into the master CSV; make_paper_tables.py emits table_ablation_master.md alongside H1-H4 tables.
+- Master table coverage: PASS. reports/tables/table_ablation_master.md contains 15 one-seed data rows and includes final_loss and best_loss columns.
+- Verification: PASS. py_compile passed for scripts/train/ablate.py and scripts/analysis/make_paper_tables.py; table generation completed with expected 1-seed coverage warnings.
+Notes:
+- best_loss is sourced from metrics.json best_val_loss for row-to-row consistency.
+- Full thesis claims still require at least 3 seeds; this audit covers the 1-seed table artifact only.
+

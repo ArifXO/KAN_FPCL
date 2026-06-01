@@ -1,7 +1,8 @@
-# H1 Geometry: MLP vs KAN vs res_KAN (VAL split (biased))
+# H1 Geometry: MLP vs KAN vs res_KAN (test split)
 
-| cell_id        | head             | params_total | n_seeds | macro_auroc  | alignment    | uniformity    | effective_rank | macro_auroc_knn |
-| -------------- | ---------------- | ------------ | ------- | ------------ | ------------ | ------------- | -------------- | --------------- |
-| mlp_infonce    | mlp              | 11,499,584   | 1       | 0.6749 (n=1) | 0.2245 (n=1) | -3.8851 (n=1) | 116.92 (n=1)   | 0.6275 (n=1)    |
-| kan_infonce    | fastkan          | 11,498,747   | 1       | 0.6718 (n=1) | 0.2074 (n=1) | -3.7682 (n=1) | 45.53 (n=1)    | 0.6194 (n=1)    |
-| reskan_infonce | residual_fastkan | 11,536,851   | 1       | 0.6783 (n=1) | 0.2266 (n=1) | -3.8830 (n=1) | 116.30 (n=1)   | 0.6289 (n=1)    |
+| cell_id          | head             | params_total | n_seeds | macro_auroc  | alignment    | uniformity    | effective_rank | macro_auroc_knn |
+| ---------------- | ---------------- | ------------ | ------- | ------------ | ------------ | ------------- | -------------- | --------------- |
+| mlp_infonce      | mlp              | 11,499,584   | 1       | 0.6773 (n=1) | 0.2204 (n=1) | -3.8861 (n=1) | 116.95 (n=1)   | 0.6277 (n=1)    |
+| kan_infonce      | fastkan          | 11,498,747   | 1       | 0.6804 (n=1) | 0.2078 (n=1) | -3.7664 (n=1) | 45.49 (n=1)    | 0.6170 (n=1)    |
+| kan_wide_infonce | fastkan_wide     | 11,907,778   | 1       | 0.6801 (n=1) | 0.2224 (n=1) | -3.8262 (n=1) | 73.55 (n=1)    | 0.6172 (n=1)    |
+| reskan_infonce   | residual_fastkan | 11,536,851   | 1       | 0.6743 (n=1) | 0.2265 (n=1) | -3.8846 (n=1) | 116.77 (n=1)   | 0.6286 (n=1)    |

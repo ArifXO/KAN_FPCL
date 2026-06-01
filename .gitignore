@@ -42,13 +42,27 @@ multirun/
 *.pkl
 *.pickle
 
-# Run artifacts
+# Run artifacts — large outputs are never committed. Per-run dirs are named
+# "{cell_id}_s{seed}_{run_id}" by save_run_artifacts, not "run_*", so the old
+# rule never matched. Ignore everything under each sub-folder and re-include
+# the .gitkeep placeholders so the directory skeleton stays in git.
 _archive_preaudit/
-runs/ablation/**/run_*/
-runs/smoke/
-!runs/smoke/
-runs/smoke/**
-!runs/smoke/.gitkeep
+runs/ablation/*
+runs/ablation/**/*
+runs/archive/*
+runs/archive/**/*
+runs/checkpoints/*
+runs/checkpoints/**/*
+runs/smoke/*
+runs/smoke/**/*
+runs/figures/*
+runs/tables/*
+# Aggregate CSV/JSON outputs from ablate.py / probe.py / analyze_geometry.py
+# (regenerable from per-run artifacts; not part of the source tree).
+runs/results/*.csv
+runs/results/*.json
+# Keep placeholder markers so the runs/ skeleton is preserved.
+!runs/**/.gitkeep
 *.pt
 *.pth
 *.ckpt

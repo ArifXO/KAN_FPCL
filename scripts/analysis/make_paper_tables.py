@@ -1,4 +1,4 @@
-"""Generate H1-H4 Markdown tables from ``ablation_master.csv``.
+"""Generate master and H1-H4 Markdown tables from ``ablation_master.csv``.
 
 The ablation CSV is expected to come from ``scripts/train/ablate.py``. Failed rows
 and smoke rows are excluded by default so thesis tables only average completed
@@ -27,6 +27,42 @@ PROJECT_ROOT = Path(os.environ.get("PROJECT_ROOT", Path(__file__).resolve().pare
 
 # ChestMNIST: rarest 3 classes by frequency (hernia ~0.2%, emphysema ~2%, fibrosis ~1.5%)
 RARE_CLASSES = ("hernia", "emphysema", "fibrosis")
+
+ABLATION_CELL_ORDER = [
+    "mlp_infonce",
+    "kan_infonce",
+    "reskan_infonce",
+    "kan_wide_infonce",
+    "mlp_fn_mlp",
+    "mlp_fn_kan",
+    "kan_fn_kan",
+    "edge_scorer_no_aux",
+    "edge_contrastive",
+    "edge_align",
+    "zonly_fn",
+    "edge_contrastive_kan",
+    "debiased",
+    "supcon_oracle_any_overlap",
+    "supcon_oracle_jaccard",
+]
+
+ABLATION_CELL_GROUP = {
+    "mlp_infonce": "H1",
+    "kan_infonce": "H1",
+    "reskan_infonce": "H1",
+    "kan_wide_infonce": "H1 param",
+    "mlp_fn_mlp": "H2",
+    "mlp_fn_kan": "H3",
+    "kan_fn_kan": "H3",
+    "edge_scorer_no_aux": "H4",
+    "edge_contrastive": "H4",
+    "edge_align": "H4",
+    "zonly_fn": "H4",
+    "edge_contrastive_kan": "H3 cross",
+    "debiased": "baseline",
+    "supcon_oracle_any_overlap": "oracle",
+    "supcon_oracle_jaccard": "oracle",
+}
 
 CORE_COLUMNS = {
     "cell_id",
@@ -166,6 +202,9 @@ def _prepare(
         "alignment",
         "uniformity",
         "effective_rank",
+        "params_scorer",
+        "final_loss",
+        "best_loss",
         "lambda_edge",
         "lambda_edge_align",
     ):
@@ -197,6 +236,28 @@ def _fmt_params(values: pd.Series) -> str:
     if vals.nunique() == 1:
         return f"{int(vals.iloc[0]):,}"
     return _fmt_metric(vals, digits=0)
+
+
+def _fmt_value(value: object, digits: int = 4) -> str:
+    """Format one scalar table cell, preserving NA for missing values."""
+    try:
+        num = float(value)
+    except (TypeError, ValueError):
+        return "NA"
+    if not math.isfinite(num):
+        return "NA"
+    return f"{num:.{digits}f}"
+
+
+def _fmt_int_value(value: object) -> str:
+    """Format one integer-like scalar table cell."""
+    try:
+        num = float(value)
+    except (TypeError, ValueError):
+        return "NA"
+    if not math.isfinite(num):
+        return "NA"
+    return f"{int(num):,}"
 
 
 def _seed_count(values: pd.Series) -> int:
@@ -240,6 +301,64 @@ def _extract_rare_auroc(json_str: str) -> float:
         return float("nan")
 
 
+def _coalesced_rare_auroc(df: pd.DataFrame, per_class_cols: tuple[str, ...]) -> pd.Series:
+    """Return row-level rare-class AUROC, preferring test JSON when available."""
+    rare = None
+    for col in per_class_cols:
+        if col in df.columns:
+            vals = df[col].apply(_extract_rare_auroc)
+            rare = vals if rare is None else rare.fillna(vals)
+    if rare is not None:
+        return rare
+    if "rare_disease_auroc" in df.columns:
+        return pd.to_numeric(df["rare_disease_auroc"], errors="coerce")
+    return pd.Series(float("nan"), index=df.index)
+
+
+def _build_master_table(
+    df: pd.DataFrame,
+    per_class_cols: tuple[str, ...],
+) -> pd.DataFrame:
+    """Build one row per ablation cell/seed for audit and presentation."""
+    if df.empty:
+        return pd.DataFrame()
+    sub = df.copy()
+    cells = sub["cell_id"].astype(str)
+    ordered_cells = [c for c in ABLATION_CELL_ORDER if c in set(cells)]
+    extra_cells = sorted(set(cells) - set(ABLATION_CELL_ORDER))
+    order = ordered_cells + extra_cells
+    sub["cell_id"] = pd.Categorical(cells, categories=order, ordered=True)
+    sub = sub.sort_values(["cell_id", "seed"]).reset_index(drop=True)
+    cell_text = sub["cell_id"].astype(str)
+    sub["rare_auroc"] = _coalesced_rare_auroc(sub, per_class_cols)
+
+    status = sub["status"].astype(str) if "status" in sub.columns else "OK"
+    table = pd.DataFrame({
+        "group": cell_text.map(ABLATION_CELL_GROUP).fillna("extra"),
+        "cell_id": cell_text,
+        "seed": sub["seed"].astype(str),
+        "head": sub["head"].astype(str),
+        "loss": sub["loss"].astype(str),
+        "scorer": sub["scorer"].astype(str),
+        "lambda_edge": sub["lambda_edge"].apply(lambda v: _fmt_value(v, digits=2)),
+        "lambda_edge_align": sub["lambda_edge_align"].apply(lambda v: _fmt_value(v, digits=2)),
+        "params_total": sub["params_total"].apply(_fmt_int_value),
+        "params_scorer": sub["params_scorer"].apply(_fmt_int_value),
+        "final_loss": sub["final_loss"].apply(_fmt_value),
+        "best_loss": sub["best_loss"].apply(_fmt_value),
+        "macro_auroc": sub["macro_auroc"].apply(_fmt_value),
+        "macro_auroc_knn": sub["macro_auroc_knn"].apply(_fmt_value),
+        "mAP": sub["mAP"].apply(_fmt_value),
+        "rare_auroc": sub["rare_auroc"].apply(_fmt_value),
+        "alignment": sub["alignment"].apply(_fmt_value),
+        "uniformity": sub["uniformity"].apply(_fmt_value),
+        "effective_rank": sub["effective_rank"].apply(lambda v: _fmt_value(v, digits=2)),
+        "runtime_sec": sub["runtime_sec"].apply(lambda v: _fmt_value(v, digits=2)),
+        "status": status,
+    })
+    return table
+
+
 def _build_tables(df: pd.DataFrame, per_class_cols: tuple[str, ...]) -> dict[str, pd.DataFrame]:
     # Each hypothesis isolates EXACTLY ONE experimental factor:
     # H1: head architecture     (fixed: InfoNCE loss, no scorer)
@@ -270,13 +389,7 @@ def _build_tables(df: pd.DataFrame, per_class_cols: tuple[str, ...]) -> dict[str
     def _rare_source(sub: pd.DataFrame) -> str:
         present = [c for c in per_class_cols if c in sub.columns]
         if present:
-            # Coalesce per row across the candidate JSON columns (test then val)
-            # so a row lacking a test fingerprint still reports its val rare AUROC.
-            rare = None
-            for col in present:
-                vals = sub[col].apply(_extract_rare_auroc)
-                rare = vals if rare is None else rare.fillna(vals)
-            sub["rare_auroc"] = rare
+            sub["rare_auroc"] = _coalesced_rare_auroc(sub, tuple(present))
             return "rare_auroc"
         return "rare_disease_auroc"
 
@@ -433,9 +546,11 @@ def main() -> None:
     split = _resolve_split(raw, args.split)
     df = _prepare(raw, args.include_smoke, args.include_failed, _metric_aliases(split))
     per_class_cols = _per_class_cols(df, split)
-    tables = _build_tables(df, per_class_cols)
+    tables = {"table_ablation_master.md": _build_master_table(df, per_class_cols)}
+    tables.update(_build_tables(df, per_class_cols))
     split_tag = "test split" if split == "test" else "VAL split (biased)"
     titles = {
+        "table_ablation_master.md": f"Ablation Master: all cells ({split_tag})",
         "table_h1.md": f"H1 Geometry: MLP vs KAN vs res_KAN ({split_tag})",
         "table_h2.md": f"H2 InfoNCE vs FN-weighted, with rare-class AUROC ({split_tag})",
         "table_h3.md": f"H3 FN Scorer Comparison ({split_tag})",
