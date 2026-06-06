@@ -33,7 +33,8 @@ from omegaconf import DictConfig
 
 _COLUMNS = [
     "cell_id", "head", "loss", "scorer", "lambda_edge", "lambda_edge_align",
-    "dataset", "seed", "params_total", "params_scorer", "final_loss", "best_loss",
+    "dataset", "seed", "params_total", "params_scorer",
+    "final_train_loss", "final_val_loss", "best_val_loss",
     "macro_auroc_linear", "macro_auroc_knn",
     "mAP", "per_class_auroc_linear_json",
     # Test-split metrics: model_best.pt is selected on val, so val numbers are
@@ -111,6 +112,16 @@ def _last_csv_row(csv_path: Path) -> dict[str, str]:
     return rows[-1]
 
 
+def _last_val_loss(metrics: dict) -> object:
+    curve = metrics.get("val_loss_curve", [])
+    if not curve:
+        return ""
+    last = curve[-1]
+    if isinstance(last, dict):
+        return last.get("val_loss", "")
+    return ""
+
+
 def _loss_metrics(ckpt_dir: Path) -> dict[str, object]:
     metrics_path = ckpt_dir / "metrics.json"
     if not metrics_path.exists():
@@ -118,8 +129,9 @@ def _loss_metrics(ckpt_dir: Path) -> dict[str, object]:
     with open(metrics_path, "r") as f:
         metrics = json.load(f)
     return {
-        "final_loss": metrics.get("train_loss_final", ""),
-        "best_loss": metrics.get("best_val_loss", ""),
+        "final_train_loss": metrics.get("train_loss_final", ""),
+        "final_val_loss": _last_val_loss(metrics),
+        "best_val_loss": metrics.get("best_val_loss", ""),
     }
 
 
@@ -222,8 +234,9 @@ def _run_cell(
         row.update({
             "params_total": probe_row.get("params_total", ""),
             "params_scorer": probe_row.get("params_scorer", "0"),
-            "final_loss": loss_row.get("final_loss", ""),
-            "best_loss": loss_row.get("best_loss", ""),
+            "final_train_loss": loss_row.get("final_train_loss", ""),
+            "final_val_loss": loss_row.get("final_val_loss", ""),
+            "best_val_loss": loss_row.get("best_val_loss", ""),
             "macro_auroc_linear": probe_row.get("macro_auroc_linear", ""),
             "macro_auroc_knn": probe_row.get("macro_auroc_knn", ""),
             "mAP": probe_row.get("mAP", ""),

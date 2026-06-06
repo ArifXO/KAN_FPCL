@@ -205,8 +205,9 @@ def _prepare(
         "uniformity",
         "effective_rank",
         "params_scorer",
-        "final_loss",
-        "best_loss",
+        "final_train_loss",
+        "final_val_loss",
+        "best_val_loss",
         "lambda_edge",
         "lambda_edge_align",
     ):
@@ -317,13 +318,6 @@ def _attach_loss_metrics(df: pd.DataFrame, runs_root: Path) -> pd.DataFrame:
         coalesce_numeric(col, loaded_df[col])
         out[col] = pd.to_numeric(out[col], errors="coerce")
 
-    # Keep the compact master-table aliases populated even when the source CSV
-    # predates the ablate.py columns, and keep H tables populated when only the
-    # compact aliases are present.
-    coalesce_numeric("final_train_loss", out.get("final_loss", out["final_train_loss"]))
-    coalesce_numeric("best_val_loss", out.get("best_loss", out["best_val_loss"]))
-    coalesce_numeric("final_loss", out["final_train_loss"])
-    coalesce_numeric("best_loss", out["best_val_loss"])
     return out
 
 
@@ -411,8 +405,9 @@ def _build_master_table(
         "lambda_edge_align": sub["lambda_edge_align"].apply(lambda v: _fmt_value(v, digits=2)),
         "params_total": sub["params_total"].apply(_fmt_int_value),
         "params_scorer": sub["params_scorer"].apply(_fmt_int_value),
-        "final_loss": sub["final_loss"].apply(_fmt_value),
-        "best_loss": sub["best_loss"].apply(_fmt_value),
+        "final_train_loss": sub["final_train_loss"].apply(_fmt_value),
+        "final_val_loss": sub["final_val_loss"].apply(_fmt_value),
+        "best_val_loss": sub["best_val_loss"].apply(_fmt_value),
         "macro_auroc": sub["macro_auroc"].apply(_fmt_value),
         "macro_auroc_knn": sub["macro_auroc_knn"].apply(_fmt_value),
         "mAP": sub["mAP"].apply(_fmt_value),
